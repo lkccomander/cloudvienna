@@ -29,12 +29,12 @@ def tk_arc(canvas, c, r, style, start, extent, outline, fill):
     )
 
 
-def tk_tick(canvas, c, ri, l, angle, fill, width=1, tags=None):
+def tk_tick(canvas, c, ri, length, angle, fill, width=1, tags=None):
     r = angle * pi / 180.0
     x0 = c[0] + ri * cos(r)
     y0 = c[1] + ri * sin(r)
-    x1 = c[0] + (ri + l) * cos(r)
-    y1 = c[1] + (ri + l) * sin(r)
+    x1 = c[0] + (ri + length) * cos(r)
+    y1 = c[1] + (ri + length) * sin(r)
     return canvas.create_line(x0, y0, x1, y1, fill=fill, width=width, tags=tags)
 
 
