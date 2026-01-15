@@ -1,6 +1,6 @@
 import logging
 from tkinter import messagebox
-from psycopg.errors import (
+from psycopg2.errors import (
     UniqueViolation,
     ForeignKeyViolation,
     NotNullViolation,
