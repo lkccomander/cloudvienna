@@ -394,10 +394,11 @@ def on_student_select(event):
     if not sel:
         return
 
-    v = students_tree.item(sel[0])["values"]
+    item = students_tree.item(sel[0])
+    v = item["values"]
 
     selected_student_id = v[0]
-    selected_student_active = (v[8] == "🟢 Active")
+    selected_student_active = ("active" in item.get("tags", ()))
 
     st_name.set(v[1])
     st_email.set(v[2])
@@ -512,18 +513,18 @@ for i, (lbl, var) in enumerate(fields):
 btns = ttk.Frame(teachers_form)
 btns.grid(row=len(fields), column=0, columnspan=2, pady=10)
 
-btn_add = ttk.Button(btns, text="Register")
-btn_update = ttk.Button(btns, text="Update")
-btn_deactivate = ttk.Button(btns, text="Deactivate")
-btn_reactivate = ttk.Button(btns, text="Reactivate")
+tc_btn_add = ttk.Button(btns, text="Register")
+tc_btn_update = ttk.Button(btns, text="Update")
+tc_btn_deactivate = ttk.Button(btns, text="Deactivate")
+tc_btn_reactivate = ttk.Button(btns, text="Reactivate")
 
-btn_add.grid(row=0, column=0, padx=4)
-btn_update.grid(row=0, column=1, padx=4)
-btn_deactivate.grid(row=0, column=2, padx=4)
-btn_reactivate.grid(row=0, column=3, padx=4)
+tc_btn_add.grid(row=0, column=0, padx=4)
+tc_btn_update.grid(row=0, column=1, padx=4)
+tc_btn_deactivate.grid(row=0, column=2, padx=4)
+tc_btn_reactivate.grid(row=0, column=3, padx=4)
 
-btn_deactivate.config(state="disabled")
-btn_reactivate.config(state="disabled")
+tc_btn_deactivate.config(state="disabled")
+tc_btn_reactivate.config(state="disabled")
 
 # ---------- TreeView ----------
 teachers_tree = ttk.Treeview(
@@ -570,9 +571,10 @@ def on_teacher_select(event):
     if not sel:
         return
 
-    v = teachers_tree.item(sel[0])["values"]
+    item = teachers_tree.item(sel[0])
+    v = item["values"]
     selected_teacher_id = v[0]
-    selected_teacher_active = (v[5] == "🟢 Active")
+    selected_teacher_active = ("active" in item.get("tags", ()))
 
     tc_name.set(v[1])
     tc_email.set(v[2])
@@ -580,11 +582,11 @@ def on_teacher_select(event):
     tc_belt.set(v[4])
 
     if selected_teacher_active:
-        btn_deactivate.config(state="normal")
-        btn_reactivate.config(state="disabled")
+        tc_btn_deactivate.config(state="normal")
+        tc_btn_reactivate.config(state="disabled")
     else:
-        btn_deactivate.config(state="disabled")
-        btn_reactivate.config(state="normal")
+        tc_btn_deactivate.config(state="disabled")
+        tc_btn_reactivate.config(state="normal")
 
 teachers_tree.bind("<<TreeviewSelect>>", on_teacher_select)
 
@@ -648,10 +650,10 @@ def reactivate_teacher():
     load_teachers()
 
 # ---------- Bind buttons ----------
-btn_add.config(command=register_teacher)
-btn_update.config(command=update_teacher)
-btn_deactivate.config(command=deactivate_teacher)
-btn_reactivate.config(command=reactivate_teacher)
+tc_btn_add.config(command=register_teacher)
+tc_btn_update.config(command=update_teacher)
+tc_btn_deactivate.config(command=deactivate_teacher)
+tc_btn_reactivate.config(command=reactivate_teacher)
 
 # ---------- Init ----------
 load_teachers()
