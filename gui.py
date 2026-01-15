@@ -57,6 +57,57 @@ notebook.add(tab_sessions,   text="Sessions")
 
 root.title(f"BJJ Academy Management v{__version__}")
 
+# ============================
+# TAB — ATTENDANCE
+# ============================
+
+attendance_main = ttk.Frame(tab_attendance, padding=10)
+attendance_main.pack(fill="both", expand=True)
+
+attendance_main.columnconfigure(0, weight=1)
+attendance_main.rowconfigure(1, weight=1)
+
+attendance_header = ttk.LabelFrame(attendance_main, text="Attendance Date", padding=10)
+attendance_header.grid(row=0, column=0, sticky="ew", pady=5)
+
+att_date = DateEntry(attendance_header, date_pattern="yyyy-mm-dd")
+att_date.grid(row=0, column=0, padx=5)
+
+btn_load_attendance = ttk.Button(attendance_header, text="Load")
+btn_load_attendance.grid(row=0, column=1, padx=5)
+
+attendance_list = ttk.LabelFrame(attendance_main, text="Students", padding=10)
+attendance_list.grid(row=1, column=0, sticky="nsew")
+
+attendance_tree = ttk.Treeview(
+    attendance_list,
+    columns=("id", "name", "present"),
+    show="headings",
+    height=15
+)
+
+attendance_tree.heading("id", text="ID")
+attendance_tree.heading("name", text="Student")
+attendance_tree.heading("present", text="Present")
+
+attendance_tree.column("id", width=60, anchor="center")
+attendance_tree.column("present", width=80, anchor="center")
+
+attendance_tree.pack(fill="both", expand=True)
+
+attendance_actions = ttk.Frame(attendance_main)
+attendance_actions.grid(row=2, column=0, pady=10)
+
+btn_mark_present = ttk.Button(attendance_actions, text="Mark Present")
+btn_mark_absent = ttk.Button(attendance_actions, text="Mark Absent")
+btn_save_attendance = ttk.Button(attendance_actions, text="Save")
+
+btn_mark_present.grid(row=0, column=0, padx=5)
+btn_mark_absent.grid(row=0, column=1, padx=5)
+btn_save_attendance.grid(row=0, column=2, padx=5)
+
+
+
 
 
 # =====================================================
