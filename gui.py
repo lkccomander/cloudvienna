@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from tkcalendar import DateEntry
+from version import __version__
+
 
 import matplotlib
 from datetime import date
@@ -53,6 +55,7 @@ notebook.add(tab_teachers,   text="Teachers")
 notebook.add(tab_attendance, text="Attendance")
 notebook.add(tab_sessions,   text="Sessions")
 
+root.title(f"BJJ Academy Management v{__version__}")
 
 
 
