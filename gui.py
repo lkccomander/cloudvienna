@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 from tkcalendar import DateEntry
 
 import matplotlib
+from datetime import date
 matplotlib.use("TkAgg")
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -339,6 +340,21 @@ def reactivate_student():
     load_students_view()
     refresh_charts()
 
+def clear_student_form():
+    global selected_student_id, selected_student_active
+    selected_student_id = None
+    selected_student_active = None
+
+    st_name.set("")
+    st_email.set("")
+    st_belt.set("")
+    st_weight.set("")
+    st_phone.set("")
+    st_country.set("Austria")
+    st_birthday.set_date(date.today())
+
+    update_button_states()
+
 
 # =====================================================
 # BUTTONS
@@ -350,11 +366,13 @@ btn_register = ttk.Button(btns, text="Register", command=register_student)
 btn_update = ttk.Button(btns, text="Update", command=update_student)
 btn_deactivate = ttk.Button(btns, text="Deactivate", command=deactivate_student)
 btn_reactivate = ttk.Button(btns, text="Reactivate", command=reactivate_student)
+btn_clear = ttk.Button(btns, text="Clear", command=clear_student_form)
 
 btn_register.grid(row=0, column=0, padx=5)
 btn_update.grid(row=0, column=1, padx=5)
 btn_deactivate.grid(row=0, column=2, padx=5)
 btn_reactivate.grid(row=0, column=3, padx=5)
+btn_clear.grid(row=0, column=4, padx=5)
 
 btn_deactivate.config(state="disabled")
 btn_reactivate.config(state="disabled")
