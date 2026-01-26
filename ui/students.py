@@ -55,29 +55,31 @@ def build(tab_students):
     # Fetch a page of students based on the active filter.
     def load_students_paged(page):
         if filter_active.get() == "Active":
-            where = "WHERE active = true"
+            where = "WHERE s.active = true"
         elif filter_active.get() == "Inactive":
-            where = "WHERE active = false"
+            where = "WHERE s.active = false"
         else:
             where = ""
 
         return execute(f"""
-            SELECT id, name, sex, direction,postalcode,belt,email,phone,phone2,weight,country,taxid, birthday, active
-            FROM t_students
+            SELECT s.id, s.name, s.sex, s.direction, s.postalcode, s.belt, s.email, s.phone, s.phone2,
+                   s.weight, s.country, s.taxid, l.name AS location, s.birthday, s.active
+            FROM t_students s
+            LEFT JOIN t_locations l ON s.location_id = l.id
             {where}
-            ORDER BY id
+            ORDER BY s.id
             LIMIT %s OFFSET %s
         """, (PAGE_SIZE_STUDENTS, page * PAGE_SIZE_STUDENTS))
 
     # Count students based on the active filter for pagination.
     def count_students():
         if filter_active.get() == "Active":
-            where = "WHERE active = true"
+            where = "WHERE s.active = true"
         elif filter_active.get() == "Inactive":
-            where = "WHERE active = false"
+            where = "WHERE s.active = false"
         else:
             where = ""
-        return execute(f"SELECT COUNT(id) FROM t_students {where}")[0][0]
+        return execute(f"SELECT COUNT(s.id) FROM t_students s {where}")[0][0]
 
     # ---------- Filter ----------
     filter_frame = ttk.Frame(tab_students)
@@ -133,6 +135,27 @@ def build(tab_students):
     st_country = tk.StringVar(value="Austria")
     st_taxid = tk.StringVar()
     st_birthday = tk.StringVar()
+    st_location = tk.StringVar()
+
+    location_option_map = {}
+
+    # Populate the location combobox with active locations.
+    def refresh_location_options():
+        nonlocal location_option_map
+        rows = execute("""
+            SELECT id, name
+            FROM t_locations
+            WHERE active = true
+            ORDER BY name
+        """)
+        options = []
+        option_map = {}
+        for loc_id, name in rows:
+            label = f"{name} (#{loc_id})"
+            options.append(label)
+            option_map[label] = loc_id
+        location_option_map = option_map
+        return options
 
     # =====================================================
     # FORM FIELDS
@@ -149,8 +172,10 @@ def build(tab_students):
         ("Weight (kg)", st_weight),
         ("Country", st_country),
         ("Tax ID", st_taxid),
+        ("Location", st_location),
     ]
 
+    location_cb = None
     for i, (lbl, var) in enumerate(fields):
         ttk.Label(form, text=lbl).grid(row=i, column=0, sticky="w")
         if lbl == "Belt":
@@ -165,12 +190,29 @@ def build(tab_students):
                 values=["Male", "Female", "Other"],
                 state="readonly", width=25
             ).grid(row=i, column=1)
+        elif lbl == "Location":
+            location_cb = ttk.Combobox(
+                form,
+                textvariable=var,
+                values=refresh_location_options(),
+                state="readonly",
+                width=25
+            )
+            location_cb.grid(row=i, column=1)
         else:
             ttk.Entry(form, textvariable=var, width=30).grid(row=i, column=1)
 
     ttk.Label(form, text="Birthday").grid(row=len(fields), column=0, sticky="w")
     st_birthday = DateEntry(form, date_pattern="yyyy-mm-dd", width=27)
     st_birthday.grid(row=len(fields), column=1)
+
+    # Refresh the location combobox on click to pick up new locations.
+    def on_location_click(event):
+        options = refresh_location_options()
+        if location_cb is not None:
+            location_cb["values"] = options
+    if location_cb is not None:
+        location_cb.bind("<Button-1>", on_location_click)
 
     # =====================================================
     # CHARTS
@@ -250,8 +292,8 @@ def build(tab_students):
 
             execute("""
                 INSERT INTO t_students
-                (name,sex,direction,postalcode,belt,email,phone,phone2,weight,country,taxid,birthday)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                (name,sex,direction,postalcode,belt,email,phone,phone2,weight,country,taxid,birthday,location_id)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (
                 st_name.get(),
                 st_sex.get(),
@@ -264,7 +306,8 @@ def build(tab_students):
                 float(st_weight.get()) if st_weight.get() else None,
                 st_country.get(),
                 st_taxid.get(),
-                st_birthday.get_date()
+                st_birthday.get_date(),
+                location_option_map.get(st_location.get())
             ))
 
             load_students_view()
@@ -293,7 +336,7 @@ def build(tab_students):
             execute("""
                 UPDATE t_students
                 SET name=%s,sex=%s,direction=%s,postalcode=%s,belt=%s,email=%s,phone=%s,phone2=%s,
-                    weight=%s,country=%s,taxid=%s,
+                    weight=%s,country=%s,taxid=%s,location_id=%s,
                     birthday=%s,updated_at=now()
                 WHERE id=%s
             """, (
@@ -308,6 +351,7 @@ def build(tab_students):
                 float(st_weight.get()) if st_weight.get() else None,
                 st_country.get(),
                 st_taxid.get(),
+                location_option_map.get(st_location.get()),
                 st_birthday.get_date(),
                 selected_student_id
             ))
@@ -364,6 +408,7 @@ def build(tab_students):
         st_weight.set("")
         st_country.set("Austria")
         st_taxid.set("")
+        st_location.set("")
         st_birthday.set_date(date.today())
 
         update_button_states()
@@ -394,7 +439,7 @@ def build(tab_students):
     # =====================================================
     students_tree = ttk.Treeview(
         tree_frame,
-        columns=("id", "name", "sex", "direction", "postalcode", "belt", "email", "phone", "phone2", "weight", "country", "taxid", "birthday", "status"),
+        columns=("id", "name", "sex", "direction", "postalcode", "belt", "email", "phone", "phone2", "weight", "country", "taxid", "location", "birthday", "status"),
         show="headings"
     )
     for c in students_tree["columns"]:
@@ -441,8 +486,14 @@ def build(tab_students):
         st_weight.set("" if v[9] is None else str(v[9]))
         st_country.set(v[10])
         st_taxid.set(v[11])
-        if v[12]:
-            st_birthday.set_date(v[12])
+        location_label = ""
+        for label, loc_id in location_option_map.items():
+            if v[12] and label.startswith(f"{v[12]} ("):
+                location_label = label
+                break
+        st_location.set(location_label)
+        if v[13]:
+            st_birthday.set_date(v[13])
 
         update_button_states()
 
@@ -466,19 +517,19 @@ def build(tab_students):
         if not rows:
             students_tree.insert(
                 "", tk.END,
-                values=("", "No data", "", "", "", "", "", "", "", "", "", "", "", ""),
+                values=("", "No data", "", "", "", "", "", "", "", "", "", "", "", "", ""),
                 tags=("inactive",)
             )
             lbl_page.config(text="Page 1 / 1")
             return
 
         for row in rows:
-            active = row[13]
+            active = row[14]
             status = "Active" if active else "Inactive"
             tag = "active" if active else "inactive"
             students_tree.insert(
                 "", tk.END,
-                values=row[:13] + (status,),
+                values=row[:14] + (status,),
                 tags=(tag,)
             )
 
