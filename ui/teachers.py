@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+from tkcalendar import DateEntry
 
 from db import execute
 from validation_middleware import validate_required, validate_email
@@ -13,6 +14,8 @@ def build(tab_teachers):
     tc_email = tk.StringVar()
     tc_phone = tk.StringVar()
     tc_belt = tk.StringVar()
+    tc_hire_date = tk.StringVar()
+    hire_date_entry = None
 
     selected_teacher_id = None
     selected_teacher_active = None
@@ -34,6 +37,7 @@ def build(tab_teachers):
         ("Email", tc_email),
         ("Phone", tc_phone),
         ("Belt", tc_belt),
+        ("Hire Date", tc_hire_date),
     ]
 
     for i, (lbl, var) in enumerate(fields):
@@ -54,6 +58,10 @@ def build(tab_teachers):
                 state="readonly",
                 width=25
             ).grid(row=i, column=1)
+        elif lbl == "Hire Date":
+            nonlocal_hire = DateEntry(teachers_form, date_pattern="yyyy-mm-dd", width=27)
+            nonlocal_hire.grid(row=i, column=1)
+            hire_date_entry = nonlocal_hire
         else:
             ttk.Entry(teachers_form, textvariable=var, width=30).grid(row=i, column=1)
 
@@ -146,19 +154,24 @@ def build(tab_teachers):
     # =====================================================
     # Validate and insert a new teacher, then reload the list.
     def register_teacher():
+        print("DEBUG", hire_date_entry.get(),tc_name.get(), tc_email.get(), tc_sex.get(), tc_phone.get(), tc_belt.get())
+
         try:
             validate_required(tc_name.get(), "Name")
             validate_email(tc_email.get())
+            if hire_date_entry is None:
+                raise ValueError("Hire date widget missing")
 
             execute("""
-                INSERT INTO public.t_coaches (name,sex,email,phone,belt)
-                VALUES (%s,%s,%s,%s,%s)
+                INSERT INTO public.t_coaches (name,sex,email,phone,belt,hire_date)
+                VALUES (%s,%s,%s,%s,%s,%s)
             """, (
                 tc_name.get(),
                 tc_sex.get(),
                 tc_email.get().strip(),
                 tc_phone.get(),
-                tc_belt.get()
+                tc_belt.get(),
+                hire_date_entry.get_date()
             ))
 
             load_teachers()

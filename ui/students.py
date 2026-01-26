@@ -248,10 +248,9 @@ def build(tab_students):
                 st_postalcode.get(),
                 st_belt.get(),
                 st_email.get().strip(),
-                float(st_weight.get()) if st_weight.get() else None,
                 st_phone.get(),
                 st_phone2.get(),
-                st_weight.get(),
+                float(st_weight.get()) if st_weight.get() else None,
                 st_country.get(),
                 st_taxid.get(),
                 st_birthday.get_date()
