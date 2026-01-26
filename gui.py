@@ -1,14 +1,23 @@
+import logging
 import tkinter as tk
-from tkinter import ttk
+import traceback
+from tkinter import ttk, messagebox
 
 from version import __version__
 from ui import about, attendance, sessions, students, teachers
 
 
 def main():
-    root = tk.Tk()
-    root.title("BJJ Academy Management")
-    root.geometry("1400x850")
+    logging.basicConfig(
+        filename="app.log",
+        level=logging.ERROR,
+        format="%(asctime)s | %(levelname)s | %(message)s"
+    )
+
+    try:
+        root = tk.Tk()
+        root.title("BJJ Academy Management")
+        root.geometry("1400x850")
 
     notebook = ttk.Notebook(root)
     notebook.pack(fill=tk.BOTH, expand=True)
@@ -41,7 +50,16 @@ def main():
     sessions_api["load_sessions"]()
     about_api["refresh_about_panel"]()
 
-    root.mainloop()
+        root.mainloop()
+    except Exception:
+        logging.error("APP STARTUP ERROR\n%s", traceback.format_exc())
+        try:
+            messagebox.showerror(
+                "Startup error",
+                "The app failed to start. Check app.log for details."
+            )
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
