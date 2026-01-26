@@ -110,6 +110,14 @@ def build(tab_teachers):
             ORDER BY name
         """)
 
+        if not rows:
+            teachers_tree.insert(
+                "", tk.END,
+                values=("", "No data", "", "", "", "", ""),
+                tags=("inactive",)
+            )
+            return
+
         for r in rows:
             status = "Active" if r[6] else "Inactive"
             tag = "active" if r[6] else "inactive"

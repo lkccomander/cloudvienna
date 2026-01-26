@@ -61,6 +61,9 @@ def build(tab_attendance):
     def fill_attendance_table(rows):
         for r in attendance_tree.get_children():
             attendance_tree.delete(r)
+        if not rows:
+            attendance_tree.insert("", tk.END, values=("No data", "", ""))
+            return
         for row in rows:
             attendance_tree.insert("", tk.END, values=row)
 

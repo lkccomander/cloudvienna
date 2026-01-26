@@ -154,7 +154,7 @@ def build(tab_sessions):
 
     # ---------- Helpers ----------
     # Populate the coach combobox with active coaches from the database.
-    def refresh_coach_options():
+    def refresh_coach_options(show_empty_message=False):
         nonlocal coach_option_map
         rows = execute("""
             SELECT id, name
@@ -170,6 +170,8 @@ def build(tab_sessions):
             option_map[label] = coach_id
         coach_option_map = option_map
         coach_cb["values"] = options
+        if show_empty_message and not options:
+            messagebox.showinfo("No coaches", "No active coaches found. Please add a coach first.")
 
     # Populate the class combobox with active classes from the database.
     def refresh_class_options():
@@ -223,6 +225,14 @@ def build(tab_sessions):
             JOIN public.t_coaches t ON c.coach_id = t.id
             ORDER BY c.name
         """)
+        if not rows:
+            classes_tree.insert(
+                "", tk.END,
+                values=("", "No data", "", "", "", ""),
+                tags=("inactive",)
+            )
+            refresh_class_options()
+            return
         for r in rows:
             status = "Active" if r[4] else "Inactive"
             tag = "active" if r[4] else "inactive"
@@ -242,6 +252,13 @@ def build(tab_sessions):
             JOIN t_classes c ON cs.class_id = c.id
             ORDER BY cs.session_date DESC, cs.start_time DESC
         """)
+        if not rows:
+            sessions_tree.insert(
+                "", tk.END,
+                values=("", "No data", "", "", "", "", ""),
+                tags=("cancelled",)
+            )
+            return
         for r in rows:
             status = "Cancelled" if r[6] else "Scheduled"
             tag = "cancelled" if r[6] else "scheduled"
@@ -524,6 +541,9 @@ def build(tab_sessions):
     btn_session_cancel.config(command=cancel_session)
     btn_session_restore.config(command=restore_session)
     btn_session_clear.config(command=clear_session_form)
+
+    # Refresh coach list when the combobox is clicked.
+    coach_cb.bind("<Button-1>", lambda event: refresh_coach_options(show_empty_message=True))
 
     classes_tree.bind("<<TreeviewSelect>>", on_class_select)
     sessions_tree.bind("<<TreeviewSelect>>", on_session_select)

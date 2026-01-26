@@ -184,15 +184,21 @@ def build(tab_students):
         fig = Figure(figsize=(3.2, 3.2), dpi=100)
         ax = fig.add_subplot(111)
 
-        ax.pie(
-            [active, inactive],
-            labels=["Active", "Inactive"],
-            autopct="%1.0f%%",
-            startangle=90,
-            colors=["green", "red"],
-            wedgeprops=dict(width=0.4)
-        )
-        ax.set_title("Students Status")
+        total = active + inactive
+        if total == 0:
+            ax.text(0.5, 0.5, "No data", ha="center", va="center")
+            ax.set_title("Students Status")
+            ax.axis("off")
+        else:
+            ax.pie(
+                [active, inactive],
+                labels=["Active", "Inactive"],
+                autopct="%1.0f%%",
+                startangle=90,
+                colors=["green", "red"],
+                wedgeprops=dict(width=0.4)
+            )
+            ax.set_title("Students Status")
 
         canvas = FigureCanvasTkAgg(fig, master=chart_left)
         canvas.draw()
@@ -205,10 +211,15 @@ def build(tab_students):
         fig = Figure(figsize=(3.2, 3.2), dpi=100)
         ax = fig.add_subplot(111)
 
-        ax.plot([0, 1], [0, total], marker="o")
-        ax.set_title("Total Students")
-        ax.set_ylabel("Count")
-        ax.set_xticks([])
+        if total == 0:
+            ax.text(0.5, 0.5, "No data", ha="center", va="center")
+            ax.set_title("Total Students")
+            ax.axis("off")
+        else:
+            ax.plot([0, 1], [0, total], marker="o")
+            ax.set_title("Total Students")
+            ax.set_ylabel("Count")
+            ax.set_xticks([])
 
         canvas = FigureCanvasTkAgg(fig, master=chart_right)
         canvas.draw()
@@ -451,7 +462,17 @@ def build(tab_students):
         for r in students_tree.get_children():
             students_tree.delete(r)
 
-        for row in load_students_paged(current_student_page):
+        rows = load_students_paged(current_student_page)
+        if not rows:
+            students_tree.insert(
+                "", tk.END,
+                values=("", "No data", "", "", "", "", "", "", "", "", "", "", "", ""),
+                tags=("inactive",)
+            )
+            lbl_page.config(text="Page 1 / 1")
+            return
+
+        for row in rows:
             active = row[13]
             status = "Active" if active else "Inactive"
             tag = "active" if active else "inactive"
