@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from tkcalendar import DateEntry
 
 from db import execute
@@ -85,12 +85,13 @@ def build(tab_teachers):
     # ---------- TreeView ----------
     teachers_tree = ttk.Treeview(
         teachers_list,
-        columns=("id", "name", "sex", "email", "phone", "belt", "status"),
+        columns=("id", "name", "sex", "email", "phone", "belt", "hire_date", "status"),
         show="headings"
     )
 
     for c in teachers_tree["columns"]:
         teachers_tree.heading(c, text=c)
+    teachers_tree.column("hire_date", width=0, minwidth=0, stretch=False)
 
     teachers_tree.tag_configure("active", foreground="green")
     teachers_tree.tag_configure("inactive", foreground="red")
@@ -105,7 +106,7 @@ def build(tab_teachers):
         teachers_tree.delete(*teachers_tree.get_children())
 
         rows = execute("""
-            SELECT id, name, sex, email, phone, belt, active
+            SELECT id, name, sex, email, phone, belt, hire_date, active
             FROM public.t_coaches
             ORDER BY name
         """)
@@ -113,17 +114,17 @@ def build(tab_teachers):
         if not rows:
             teachers_tree.insert(
                 "", tk.END,
-                values=("", "No data", "", "", "", "", ""),
+                values=("", "No data", "", "", "", "", "", ""),
                 tags=("inactive",)
             )
             return
 
         for r in rows:
-            status = "Active" if r[6] else "Inactive"
-            tag = "active" if r[6] else "inactive"
+            status = "Active" if r[7] else "Inactive"
+            tag = "active" if r[7] else "inactive"
             teachers_tree.insert(
                 "", tk.END,
-                values=(r[0], r[1], r[2], r[3], r[4], r[5], status),
+                values=(r[0], r[1], r[2], r[3], r[4], r[5], r[6], status),
                 tags=(tag,)
             )
 
@@ -139,6 +140,12 @@ def build(tab_teachers):
 
         item = teachers_tree.item(sel[0])
         v = item["values"]
+        if not v or not v[0]:
+            selected_teacher_id = None
+            selected_teacher_active = None
+            tc_btn_deactivate.config(state="disabled")
+            tc_btn_reactivate.config(state="disabled")
+            return
         selected_teacher_id = v[0]
         selected_teacher_active = ("active" in item.get("tags", ()))
 
@@ -147,6 +154,9 @@ def build(tab_teachers):
         tc_email.set(v[3])
         tc_phone.set(v[4])
         tc_belt.set(v[5])
+
+        if hire_date_entry is not None and v[6]:
+            hire_date_entry.set_date(v[6])
 
         if selected_teacher_active:
             tc_btn_deactivate.config(state="normal")
@@ -162,8 +172,6 @@ def build(tab_teachers):
     # =====================================================
     # Validate and insert a new teacher, then reload the list.
     def register_teacher():
-        print("DEBUG", hire_date_entry.get(),tc_name.get(), tc_email.get(), tc_sex.get(), tc_phone.get(), tc_belt.get())
-
         try:
             validate_required(tc_name.get(), "Name")
             validate_email(tc_email.get())
@@ -195,20 +203,33 @@ def build(tab_teachers):
     def update_teacher():
         if not selected_teacher_id:
             return
+        try:
+            validate_required(tc_name.get(), "Name")
+            validate_email(tc_email.get())
+            if hire_date_entry is None:
+                raise ValueError("Hire date widget missing")
 
-        execute("""
-            UPDATE public.t_coaches
-            SET name=%s,sex=%s,email=%s,phone=%s,belt=%s,updated_at=now()
-            WHERE id=%s
-        """, (
-            tc_name.get(),
-            tc_sex.get(),
-            tc_email.get().strip(),
-            tc_phone.get(),
-            tc_belt.get(),
-            selected_teacher_id
-        ))
-        load_teachers()
+            execute("""
+                UPDATE public.t_coaches
+                SET name=%s,sex=%s,email=%s,phone=%s,belt=%s,hire_date=%s,updated_at=now()
+                WHERE id=%s
+            """, (
+                tc_name.get(),
+                tc_sex.get(),
+                tc_email.get().strip(),
+                tc_phone.get(),
+                tc_belt.get(),
+                hire_date_entry.get_date(),
+                selected_teacher_id
+            ))
+            load_teachers()
+
+        except Exception as e:
+            if isinstance(e, ValidationError):
+                log_validation_error(e, "update_teacher")
+                messagebox.showerror("Validation error", str(e))
+            else:
+                handle_db_error(e, "update_teacher")
 
     # Mark the selected teacher inactive.
     def deactivate_teacher():
