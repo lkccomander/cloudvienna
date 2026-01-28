@@ -33,9 +33,9 @@ def main():
         tab_settings = ttk.Frame(notebook, padding=10)
         tab_about = ttk.Frame(notebook, padding=10)
 
+        notebook.add(tab_students, text="Students")
         notebook.add(tab_teachers, text="Teachers")
         notebook.add(tab_locations, text="Locations")
-        notebook.add(tab_students, text="Students")
         notebook.add(tab_attendance, text="Attendance")
         notebook.add(tab_sessions, text="Sessions")
         notebook.add(tab_reports, text="Reports")

@@ -7,6 +7,7 @@ _base_dir = os.path.dirname(os.path.abspath(__file__))
 _dev_env = os.path.join(_base_dir, ".env.dev")
 _default_env = os.path.join(_base_dir, ".env")
 _prod_env = os.path.join(_base_dir, ".env.prod")
+_cloud_env = os.path.join(_base_dir, ".env.cloud")
 _loaded_env_path = None
 
 if _env == "prod":
@@ -20,6 +21,13 @@ elif _env == "dev":
     if os.path.exists(_dev_env):
         load_dotenv(_dev_env, override=True)
         _loaded_env_path = _dev_env
+    else:
+        load_dotenv(_default_env, override=True)
+        _loaded_env_path = _default_env
+elif _env == "cloud":
+    if os.path.exists(_cloud_env):
+        load_dotenv(_cloud_env, override=True)
+        _loaded_env_path = _cloud_env
     else:
         load_dotenv(_default_env, override=True)
         _loaded_env_path = _default_env
