@@ -10,8 +10,13 @@ from version import __version__
 
 
 def build(tab_about):
+   # ttk.Label(tab_about, text="STUDENTS TAB OK", foreground="green").grid(
+    #    row=0, column=0, columnspan=3, sticky="w", padx=10, pady=10
+    #)
     about_frame = ttk.LabelFrame(tab_about, text="System Configuration", padding=10)
-    about_frame.pack(fill="both", expand=True)
+    about_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+    tab_about.grid_rowconfigure(1, weight=1)
+    tab_about.grid_columnconfigure(0, weight=1)
 
     about_values = {
         "version": tk.StringVar(),

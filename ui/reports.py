@@ -6,8 +6,14 @@ from db import execute
 
 
 def build(tab_reports):
+    #ttk.Label(tab_reports, text="REPORTS TAB OK", foreground="green").grid(
+     #   row=0, column=0, columnspan=3, sticky="w", padx=10, pady=10
+    #)
+    
     report_frame = ttk.LabelFrame(tab_reports, text="Smart Search", padding=10)
-    report_frame.pack(fill="both", expand=True)
+    report_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+    tab_reports.grid_rowconfigure(1, weight=1)
+    tab_reports.grid_columnconfigure(0, weight=1)
 
     report_frame.columnconfigure(0, weight=1)
     report_frame.rowconfigure(2, weight=1)

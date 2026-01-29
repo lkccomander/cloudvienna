@@ -39,6 +39,9 @@ def ensure_locations_schema():
 
 
 def build(tab_locations):
+   # ttk.Label(tab_locations, text="LOCATIONS TAB OK", foreground="green").grid(
+    #    row=0, column=0, columnspan=3, sticky="w", padx=10, pady=10
+    #)
     # Build the Locations tab UI and bind handlers.
     ensure_locations_schema()
 
@@ -50,12 +53,12 @@ def build(tab_locations):
     selected_location_active = None
 
     locations_form = ttk.LabelFrame(tab_locations, text="Location Form", padding=10)
-    locations_form.grid(row=0, column=0, sticky="nw", padx=10)
+    locations_form.grid(row=1, column=0, sticky="nw", padx=10)
 
     locations_list = ttk.LabelFrame(tab_locations, text="Locations List", padding=10)
-    locations_list.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+    locations_list.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
 
-    tab_locations.grid_rowconfigure(1, weight=1)
+    tab_locations.grid_rowconfigure(2, weight=1)
     tab_locations.grid_columnconfigure(0, weight=1)
 
     fields = [

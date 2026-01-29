@@ -5,8 +5,14 @@ from db import execute
 
 
 def build(tab_attendance):
+    #ttk.Label(tab_attendance, text="ATTENDANCE TAB OK", foreground="green").grid(
+     #   row=0, column=0, columnspan=3, sticky="w", padx=10, pady=10
+    #)
+    
     attendance_frame = ttk.LabelFrame(tab_attendance, text="Attendance", padding=10)
-    attendance_frame.pack(fill="both", expand=True)
+    attendance_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+    tab_attendance.grid_rowconfigure(1, weight=1)
+    tab_attendance.grid_columnconfigure(0, weight=1)
 
     attendance_frame.columnconfigure(0, weight=1)
     attendance_frame.rowconfigure(3, weight=1)

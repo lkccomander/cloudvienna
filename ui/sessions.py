@@ -29,21 +29,24 @@ def _ensure_session_location_schema():
 
 
 def build(tab_sessions):
+   # ttk.Label(tab_sessions, text="SESSIONS TAB OK", foreground="green").grid(
+    #    row=0, column=0, columnspan=3, sticky="w", padx=10, pady=10
+    #)
     _ensure_session_location_schema()
     sessions_form_frame = ttk.LabelFrame(tab_sessions, text="Sessions", padding=10)
-    sessions_form_frame.grid(row=0, column=1, sticky="ne", padx=10, pady=5)
+    sessions_form_frame.grid(row=1, column=1, sticky="ne", padx=10, pady=5)
 
     classes_form_frame = ttk.LabelFrame(tab_sessions, text="Classes", padding=10)
-    classes_form_frame.grid(row=0, column=0, sticky="nw", padx=10, pady=5)
+    classes_form_frame.grid(row=1, column=0, sticky="nw", padx=10, pady=5)
 
     classes_list_frame = ttk.LabelFrame(tab_sessions, text="Classes List", padding=10)
-    classes_list_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=10, pady=5)
+    classes_list_frame.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=5)
 
     sessions_list_frame = ttk.LabelFrame(tab_sessions, text="Sessions List", padding=10)
-    sessions_list_frame.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=5)
+    sessions_list_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", padx=10, pady=5)
 
-    tab_sessions.grid_rowconfigure(1, weight=1)
     tab_sessions.grid_rowconfigure(2, weight=1)
+    tab_sessions.grid_rowconfigure(3, weight=1)
     tab_sessions.grid_columnconfigure(0, weight=1)
     tab_sessions.grid_columnconfigure(1, weight=1)
 

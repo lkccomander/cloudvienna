@@ -8,6 +8,10 @@ from error_middleware import handle_db_error, log_validation_error
 
 
 def build(tab_teachers):
+   # ttk.Label(tab_teachers, text="TEACHERS TAB OK", foreground="green").grid(
+    #    row=0, column=0, columnspan=3, sticky="w", padx=10, pady=10
+    #)
+    
     # ---------- Variables ----------
     tc_name = tk.StringVar()
     tc_sex = tk.StringVar()
@@ -22,12 +26,12 @@ def build(tab_teachers):
 
     # ---------- Layout ----------
     teachers_form = ttk.LabelFrame(tab_teachers, text="Teacher Form", padding=10)
-    teachers_form.grid(row=0, column=0, sticky="nw", padx=10)
+    teachers_form.grid(row=1, column=0, sticky="nw", padx=10)
 
     teachers_list = ttk.LabelFrame(tab_teachers, text="Teachers List", padding=10)
-    teachers_list.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+    teachers_list.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
 
-    tab_teachers.grid_rowconfigure(1, weight=1)
+    tab_teachers.grid_rowconfigure(2, weight=1)
     tab_teachers.grid_columnconfigure(0, weight=1)
 
     # ---------- Form Fields ----------

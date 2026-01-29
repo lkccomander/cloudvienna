@@ -24,6 +24,10 @@ matplotlib.use("TkAgg")
 
 
 def build(tab_students):
+    #ttk.Label(tab_students, text="STUDENTS TAB OK", foreground="green").grid(
+     #   row=0, column=0, columnspan=3, sticky="w", padx=10, pady=10
+    #)
+
     current_student_page = 0
     selected_student_id = None
     selected_student_active = None
@@ -83,7 +87,7 @@ def build(tab_students):
 
     # ---------- Filter ----------
     filter_frame = ttk.Frame(tab_students)
-    filter_frame.grid(row=0, column=2, sticky="e", padx=10)
+    filter_frame.grid(row=1, column=2, sticky="e", padx=10)
 
     ttk.Label(filter_frame, text="Show").grid(row=0, column=0, padx=5)
 
@@ -98,11 +102,11 @@ def build(tab_students):
 
     # ---------- Form ----------
     form = ttk.LabelFrame(tab_students, text="Student Form", padding=10)
-    form.grid(row=0, column=0, sticky="nw")
+    form.grid(row=1, column=0, sticky="nw")
 
     # ---------- Charts ----------
     charts_frame = ttk.LabelFrame(tab_students, text="Statistics", padding=10)
-    charts_frame.grid(row=0, column=1, sticky="n", padx=15)
+    charts_frame.grid(row=1, column=1, sticky="n", padx=15)
 
     chart_left = ttk.Frame(charts_frame)
     chart_left.grid(row=0, column=0, padx=5)
@@ -112,12 +116,12 @@ def build(tab_students):
 
     # ---------- Tree ----------
     tree_frame = ttk.LabelFrame(tab_students, text="Students List", padding=10)
-    tree_frame.grid(row=1, column=0, columnspan=3, sticky="nsew")
+    tree_frame.grid(row=2, column=0, columnspan=3, sticky="nsew")
 
     nav = ttk.Frame(tab_students)
-    nav.grid(row=2, column=0, columnspan=3, pady=5)
+    nav.grid(row=3, column=0, columnspan=3, pady=5)
 
-    tab_students.grid_rowconfigure(1, weight=1)
+    tab_students.grid_rowconfigure(2, weight=1)
     tab_students.grid_columnconfigure(0, weight=1)
 
     # =====================================================
