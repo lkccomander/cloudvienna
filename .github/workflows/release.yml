@@ -24,9 +24,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Verify icon exists
+        run: |
+          if (!(Test-Path "logo1.ico")) { throw "logo1.ico not found at repo root." }
+
       - name: Build EXE
         run: |
-          pyinstaller --onefile --windowed gui.py
+          pyinstaller gui.spec
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
