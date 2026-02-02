@@ -76,7 +76,7 @@ def build(tab_about):
     _load_logo(settings.get("logo_path"))
 
     about_frame = ttk.LabelFrame(tab_about, text=t("label.system_config"), padding=10)
-    about_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
+    about_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=(10, 6))
 
     unknown_text = t("label.unknown")
 
@@ -206,5 +206,43 @@ def build(tab_about):
 
     ttk.Button(about_frame, text=t("button.refresh"), command=refresh_about_panel) \
         .grid(row=6, column=0, columnspan=2, pady=8, sticky="w")
+
+    logs_frame = ttk.LabelFrame(tab_about, text=t("label.app_log"), padding=10)
+    logs_frame.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0, 10))
+
+    log_text = tk.Text(logs_frame, height=10, wrap="none", font=("Consolas", 9))
+    log_text.grid(row=0, column=0, columnspan=2, sticky="nsew")
+
+    log_scroll_y = ttk.Scrollbar(logs_frame, orient="vertical", command=log_text.yview)
+    log_text.configure(yscrollcommand=log_scroll_y.set)
+    log_scroll_y.grid(row=0, column=2, sticky="ns")
+
+    log_scroll_x = ttk.Scrollbar(logs_frame, orient="horizontal", command=log_text.xview)
+    log_text.configure(xscrollcommand=log_scroll_x.set)
+    log_scroll_x.grid(row=1, column=0, columnspan=2, sticky="ew")
+
+    logs_frame.columnconfigure(0, weight=1)
+    logs_frame.rowconfigure(0, weight=1)
+
+    def _log_path():
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(base_dir, "app.log")
+
+    def refresh_logs():
+        path = _log_path()
+        if not os.path.exists(path):
+            content = t("label.no_log")
+        else:
+            with open(path, "r", encoding="utf-8", errors="ignore") as handle:
+                lines = handle.readlines()
+                content = "".join(reversed(lines))
+        log_text.config(state="normal")
+        log_text.delete("1.0", tk.END)
+        log_text.insert(tk.END, content)
+        log_text.config(state="disabled")
+
+    ttk.Button(logs_frame, text=t("button.refresh_logs"), command=refresh_logs).grid(
+        row=2, column=0, sticky="w", pady=(6, 0)
+    )
 
     return {"refresh_about_panel": refresh_about_panel}

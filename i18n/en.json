@@ -132,5 +132,8 @@
   "button.choose_logo": "Choose logo",
   "label.choose_logo": "Choose a logo",
   "label.jpg_files": "JPG files",
-  "label.logo_pillow_missing": "Logo preview requires Pillow. Install pillow and try again."
+  "label.logo_pillow_missing": "Logo preview requires Pillow. Install pillow and try again.",
+  "label.app_log": "Application Log",
+  "label.no_log": "app.log not found.",
+  "button.refresh_logs": "Refresh log"
 }

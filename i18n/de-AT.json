@@ -132,5 +132,8 @@
   "button.choose_logo": "Logo auswählen",
   "label.choose_logo": "Logo auswählen",
   "label.jpg_files": "JPG-Dateien",
-  "label.logo_pillow_missing": "Logo-Vorschau benötigt Pillow. Installiere pillow und versuche es erneut."
+  "label.logo_pillow_missing": "Logo-Vorschau benötigt Pillow. Installiere pillow und versuche es erneut.",
+  "label.app_log": "Anwendungsprotokoll",
+  "label.no_log": "app.log nicht gefunden.",
+  "button.refresh_logs": "Protokoll aktualisieren"
 }
