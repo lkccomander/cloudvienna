@@ -5,7 +5,7 @@ from tkinter import ttk, messagebox
 
 from version import __version__
 from i18n import init_i18n, t
-from ui import about, attendance, locations, reports, sessions, settings, students, teachers
+from ui import about, attendance, locations, news_notifications, reports, sessions, settings, students, teachers
 
 
 def main():
@@ -37,6 +37,7 @@ def main():
         tab_students = ttk.Frame(notebook, padding=10)
         tab_attendance = ttk.Frame(notebook, padding=10)
         tab_sessions = ttk.Frame(notebook, padding=10)
+        tab_news = ttk.Frame(notebook, padding=10)
         tab_reports = ttk.Frame(notebook, padding=10)
         tab_settings = ttk.Frame(notebook, padding=10)
         tab_about = ttk.Frame(notebook, padding=10)
@@ -46,6 +47,7 @@ def main():
         notebook.add(tab_locations, text=t("tab.locations"))
         notebook.add(tab_attendance, text=t("tab.attendance"))
         notebook.add(tab_sessions, text=t("tab.sessions"))
+        notebook.add(tab_news, text=t("tab.news_notifications"))
         notebook.add(tab_reports, text=t("tab.reports"))
         notebook.add(tab_settings, text=t("tab.settings"))
         notebook.add(tab_about, text=t("tab.about"))
@@ -57,6 +59,7 @@ def main():
         students_api = students.build(tab_students)
         attendance.build(tab_attendance)
         sessions_api = sessions.build(tab_sessions)
+        news_api = news_notifications.build(tab_news)
         reports.build(tab_reports)
         settings.build(tab_settings, style)
         about_api = about.build(tab_about)
@@ -69,6 +72,7 @@ def main():
         sessions_api["refresh_location_options"]()
         sessions_api["load_classes"]()
         sessions_api["load_sessions"]()
+        news_api["load_birthdays"]()
         about_api["refresh_about_panel"]()
 
         root.mainloop()
