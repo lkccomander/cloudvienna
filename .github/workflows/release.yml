@@ -30,7 +30,7 @@ jobs:
 
       - name: Build EXE
         run: |
-          pyinstaller --clean --noconfirm --onefile gui.spec
+          pyinstaller gui.spec
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
