@@ -1,8 +1,15 @@
 import json
 import os
+import sys
 
 
-_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+def _resolve_base_dir():
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+_BASE_DIR = _resolve_base_dir()
 _I18N_DIR = os.path.join(_BASE_DIR, "i18n")
 _SETTINGS_PATH = os.path.join(_BASE_DIR, "app_settings.json")
 _DEFAULT_LANG = "en"

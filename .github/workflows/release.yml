@@ -30,7 +30,7 @@ jobs:
 
       - name: Build EXE
         run: |
-          pyinstaller --clean --noconfirm --onefile --name gui gui.py
+          pyinstaller --clean --noconfirm --onefile --name gui --add-data "i18n;i18n" --add-data "app_settings.json;." gui.py
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
