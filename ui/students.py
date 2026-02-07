@@ -13,6 +13,7 @@ from validation_middleware import (
     ValidationError,
     validate_required,
     validate_email,
+    validate_optional_email,
     validate_weight,
     validate_birthday,
 )
@@ -36,6 +37,18 @@ def build(tab_students):
     execute("""
         ALTER TABLE t_students
         ADD COLUMN IF NOT EXISTS newsletter_opt_in boolean NOT NULL DEFAULT true
+    """)
+    execute("""
+        ALTER TABLE t_students
+        ADD COLUMN IF NOT EXISTS is_minor boolean NOT NULL DEFAULT false
+    """)
+    execute("""
+        ALTER TABLE t_students
+        ADD COLUMN IF NOT EXISTS guardian_name varchar(120),
+        ADD COLUMN IF NOT EXISTS guardian_email varchar(120),
+        ADD COLUMN IF NOT EXISTS guardian_phone varchar(50),
+        ADD COLUMN IF NOT EXISTS guardian_phone2 varchar(50),
+        ADD COLUMN IF NOT EXISTS guardian_relationship varchar(50)
     """)
 
     current_student_page = 0
@@ -77,7 +90,7 @@ def build(tab_students):
 
         return execute(f"""
             SELECT s.id, s.name, s.sex, s.direction, s.postalcode, s.belt, s.email, s.phone, s.phone2,
-                   s.weight, s.country, s.taxid, l.name AS location, s.birthday, s.active, s.newsletter_opt_in
+                   s.weight, s.country, s.taxid, l.name AS location, s.birthday, s.active, s.is_minor, s.newsletter_opt_in
             FROM t_students s
             LEFT JOIN t_locations l ON s.location_id = l.id
             {where}
@@ -95,9 +108,29 @@ def build(tab_students):
             where = ""
         return execute(f"SELECT COUNT(s.id) FROM t_students s {where}")[0][0]
 
-    # ---------- Filter ----------
-    filter_frame = ttk.Frame(tab_students)
-    filter_frame.grid(row=1, column=2, sticky="e", padx=10)
+    # ---------- Form ----------
+    form = ttk.LabelFrame(tab_students, text=t("label.student_form"), padding=10)
+    form.grid(row=1, column=0, sticky="nw")
+    form.grid_columnconfigure(1, weight=1)
+    form.grid_columnconfigure(3, weight=1)
+
+    style = ttk.Style()
+    style.configure("Guardian.TEntry", fieldbackground="#dff5e3")
+    style.configure("GuardianDisabled.TEntry", fieldbackground="#d9d9d9")
+
+    # ---------- Charts ----------
+    charts_frame = ttk.LabelFrame(tab_students, text=t("label.statistics"), padding=10)
+    charts_frame.grid(row=1, column=1, sticky="n", padx=15)
+
+    chart_left = ttk.Frame(charts_frame)
+    chart_left.grid(row=0, column=0, padx=5)
+
+    chart_right = ttk.Frame(charts_frame)
+    chart_right.grid(row=0, column=1, padx=5)
+
+    # ---------- Filter (below gauges) ----------
+    filter_frame = ttk.Frame(charts_frame)
+    filter_frame.grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
     ttk.Label(filter_frame, text=t("label.show")).grid(row=0, column=0, padx=5)
 
@@ -110,28 +143,14 @@ def build(tab_students):
     )
     cmb_filter.grid(row=0, column=1)
 
-    # ---------- Form ----------
-    form = ttk.LabelFrame(tab_students, text=t("label.student_form"), padding=10)
-    form.grid(row=1, column=0, sticky="nw")
-
-    # ---------- Charts ----------
-    charts_frame = ttk.LabelFrame(tab_students, text=t("label.statistics"), padding=10)
-    charts_frame.grid(row=1, column=1, sticky="n", padx=15)
-
-    chart_left = ttk.Frame(charts_frame)
-    chart_left.grid(row=0, column=0, padx=5)
-
-    chart_right = ttk.Frame(charts_frame)
-    chart_right.grid(row=0, column=1, padx=5)
-
     # ---------- Tree ----------
     tree_frame = ttk.LabelFrame(tab_students, text=t("label.students_list"), padding=10)
-    tree_frame.grid(row=2, column=0, columnspan=3, sticky="nsew")
+    tree_frame.grid(row=3, column=0, columnspan=3, sticky="nsew")
 
     nav = ttk.Frame(tab_students)
-    nav.grid(row=3, column=0, columnspan=3, pady=5)
+    nav.grid(row=4, column=0, columnspan=3, pady=5)
 
-    tab_students.grid_rowconfigure(2, weight=1)
+    tab_students.grid_rowconfigure(3, weight=1)
     tab_students.grid_columnconfigure(0, weight=1)
 
     # =====================================================
@@ -151,6 +170,12 @@ def build(tab_students):
     st_birthday = tk.StringVar()
     st_location = tk.StringVar()
     st_newsletter = tk.BooleanVar(value=default_newsletter_opt_in())
+    st_is_minor = tk.BooleanVar(value=False)
+    st_guardian_name = tk.StringVar()
+    st_guardian_email = tk.StringVar()
+    st_guardian_phone = tk.StringVar()
+    st_guardian_phone2 = tk.StringVar()
+    st_guardian_relationship = tk.StringVar()
 
     location_option_map = {}
 
@@ -235,11 +260,40 @@ def build(tab_students):
     st_birthday = DateEntry(form, date_pattern="yyyy-mm-dd", width=27)
     st_birthday.grid(row=len(fields), column=1)
 
+    guardian_fields = [
+        ("Guardian Name", st_guardian_name),
+        ("Guardian Email", st_guardian_email),
+        ("Guardian Phone", st_guardian_phone),
+        ("Guardian Phone2", st_guardian_phone2),
+        ("Guardian Relationship", st_guardian_relationship),
+    ]
+    guardian_label_map = {
+        "Guardian Name": "label.guardian_name",
+        "Guardian Email": "label.guardian_email",
+        "Guardian Phone": "label.guardian_phone",
+        "Guardian Phone2": "label.guardian_phone2",
+        "Guardian Relationship": "label.guardian_relationship",
+    }
+    guardian_widgets = {}
+    for i, (lbl, var) in enumerate(guardian_fields):
+        ttk.Label(form, text=t(guardian_label_map.get(lbl, lbl))).grid(
+            row=i, column=2, sticky="w", padx=(12, 0)
+        )
+        entry = ttk.Entry(form, textvariable=var, width=30, style="GuardianDisabled.TEntry")
+        entry.grid(row=i, column=3, sticky="w")
+        guardian_widgets[lbl] = entry
+
+    ttk.Checkbutton(
+        form,
+        text=t("label.is_minor"),
+        variable=st_is_minor
+    ).grid(row=len(guardian_fields), column=2, columnspan=2, sticky="w", padx=(12, 0), pady=(4, 0))
+
     ttk.Checkbutton(
         form,
         text=t("label.newsletter_opt_in"),
         variable=st_newsletter
-    ).grid(row=len(fields) + 1, column=0, columnspan=2, sticky="w", pady=(4, 0))
+    ).grid(row=len(guardian_fields) + 1, column=2, columnspan=2, sticky="w", padx=(12, 0), pady=(4, 0))
 
     # Refresh the location combobox on click to pick up new locations.
     def on_location_click(event):
@@ -248,6 +302,17 @@ def build(tab_students):
             location_cb["values"] = options
     if location_cb is not None:
         location_cb.bind("<Button-1>", on_location_click)
+
+    def _set_guardian_fields_state():
+        state = "normal" if st_is_minor.get() else "disabled"
+        for widget in guardian_widgets.values():
+            widget.config(
+                state=state,
+                style="Guardian.TEntry" if state == "normal" else "GuardianDisabled.TEntry",
+            )
+
+    st_is_minor.trace_add("write", lambda *args: _set_guardian_fields_state())
+    _set_guardian_fields_state()
 
     # =====================================================
     # CHARTS
@@ -318,17 +383,26 @@ def build(tab_students):
     def register_student():
         try:
             validate_required(st_name.get(), "Name")
-            validate_email(st_email.get())
             validate_weight(st_weight.get())
+            print(st_weight.get(st_weight.get()))
             validate_birthday(st_birthday.get_date())
+            if st_is_minor.get():
+                validate_required(st_guardian_name.get(), "Guardian Name")
+                if not st_guardian_email.get().strip() and not st_guardian_phone.get().strip():
+                    raise ValidationError("Guardian email or phone is required")
+                validate_optional_email(st_guardian_email.get())
+                validate_optional_email(st_email.get())
+            else:
+                validate_email(st_email.get())
 
             if not messagebox.askyesno("Confirm", "Register new student?"):
                 return
 
             execute("""
                 INSERT INTO t_students
-                (name,sex,direction,postalcode,belt,email,phone,phone2,weight,country,taxid,birthday,location_id,newsletter_opt_in)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                (name,sex,direction,postalcode,belt,email,phone,phone2,weight,country,taxid,birthday,location_id,newsletter_opt_in,
+                 is_minor,guardian_name,guardian_email,guardian_phone,guardian_phone2,guardian_relationship)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (
                 st_name.get(),
                 st_sex.get(),
@@ -343,7 +417,13 @@ def build(tab_students):
                 st_taxid.get(),
                 st_birthday.get_date(),
                 location_option_map.get(st_location.get()),
-                st_newsletter.get()
+                st_newsletter.get(),
+                st_is_minor.get(),
+                st_guardian_name.get(),
+                st_guardian_email.get().strip(),
+                st_guardian_phone.get(),
+                st_guardian_phone2.get(),
+                st_guardian_relationship.get()
             ))
 
             load_students_view()
@@ -364,8 +444,15 @@ def build(tab_students):
                 raise ValidationError("Select a student first")
 
             validate_required(st_name.get(), "Name")
-            validate_email(st_email.get())
             validate_weight(st_weight.get())
+            if st_is_minor.get():
+                validate_required(st_guardian_name.get(), "Guardian Name")
+                if not st_guardian_email.get().strip() and not st_guardian_phone.get().strip():
+                    raise ValidationError("Guardian email or phone is required")
+                validate_optional_email(st_guardian_email.get())
+                validate_optional_email(st_email.get())
+            else:
+                validate_email(st_email.get())
 
             if not messagebox.askyesno("Confirm", "Update selected student?"):
                 return
@@ -374,6 +461,8 @@ def build(tab_students):
                 UPDATE t_students
                 SET name=%s,sex=%s,direction=%s,postalcode=%s,belt=%s,email=%s,phone=%s,phone2=%s,
                     weight=%s,country=%s,taxid=%s,location_id=%s,newsletter_opt_in=%s,
+                    is_minor=%s,guardian_name=%s,guardian_email=%s,guardian_phone=%s,guardian_phone2=%s,
+                    guardian_relationship=%s,
                     birthday=%s,updated_at=now()
                 WHERE id=%s
             """, (
@@ -390,6 +479,12 @@ def build(tab_students):
                 st_taxid.get(),
                 location_option_map.get(st_location.get()),
                 st_newsletter.get(),
+                st_is_minor.get(),
+                st_guardian_name.get(),
+                st_guardian_email.get().strip(),
+                st_guardian_phone.get(),
+                st_guardian_phone2.get(),
+                st_guardian_relationship.get(),
                 st_birthday.get_date(),
                 selected_student_id
             ))
@@ -449,15 +544,21 @@ def build(tab_students):
         st_taxid.set("")
         st_location.set("")
         st_newsletter.set(default_newsletter_opt_in())
+        st_is_minor.set(False)
+        st_guardian_name.set("")
+        st_guardian_email.set("")
+        st_guardian_phone.set("")
+        st_guardian_phone2.set("")
+        st_guardian_relationship.set("")
         st_birthday.set_date(date.today())
 
         update_button_states()
 
     # =====================================================
-    # BUTTONS
+    # BUTTONS (outside form)
     # =====================================================
-    btns = ttk.Frame(form)
-    btns.grid(row=len(fields)+2, column=0, columnspan=2, pady=10)
+    btns = ttk.Frame(tab_students)
+    btns.grid(row=2, column=0, sticky="w", padx=10, pady=(4, 6))
 
     btn_register = ttk.Button(btns, text=t("button.register"), command=register_student)
     btn_update = ttk.Button(btns, text=t("button.update"), command=update_student)
@@ -479,11 +580,12 @@ def build(tab_students):
     # =====================================================
     students_tree = ttk.Treeview(
         tree_frame,
-        columns=("id", "name", "sex", "direction", "postalcode", "belt", "email", "phone", "phone2", "weight", "country", "taxid", "location", "birthday", "status", "newsletter"),
+        columns=("id", "minor", "name", "sex", "direction", "postalcode", "belt", "email", "phone", "phone2", "weight", "country", "taxid", "location", "birthday", "status", "newsletter"),
         show="headings"
     )
     header_map = {
         "id": "label.id",
+        "minor": "label.is_minor",
         "name": "label.name",
         "sex": "label.sex",
         "direction": "label.direction",
@@ -537,26 +639,45 @@ def build(tab_students):
         selected_student_id = v[0]
         selected_student_active = ("active" in item.get("tags", ()))
 
-        st_name.set(v[1])
-        st_sex.set(v[2])
-        st_direction.set(v[3])
-        st_postalcode.set(v[4])
-        st_belt.set(v[5])
-        st_email.set(v[6])
-        st_phone.set(v[7])
-        st_phone2.set(v[8])
-        st_weight.set("" if v[9] is None else str(v[9]))
-        st_country.set(v[10])
-        st_taxid.set(v[11])
+        row = execute("""
+            SELECT s.name, s.sex, s.direction, s.postalcode, s.belt, s.email, s.phone, s.phone2,
+                   s.weight, s.country, s.taxid, l.name AS location, s.birthday, s.newsletter_opt_in,
+                   s.is_minor, s.guardian_name, s.guardian_email, s.guardian_phone, s.guardian_phone2,
+                   s.guardian_relationship
+            FROM t_students s
+            LEFT JOIN t_locations l ON s.location_id = l.id
+            WHERE s.id = %s
+        """, (selected_student_id,))
+        if not row:
+            return
+        row = row[0]
+
+        st_name.set(row[0])
+        st_sex.set(row[1])
+        st_direction.set(row[2])
+        st_postalcode.set(row[3])
+        st_belt.set(row[4])
+        st_email.set(row[5] or "")
+        st_phone.set(row[6] or "")
+        st_phone2.set(row[7] or "")
+        st_weight.set("" if row[8] is None else str(row[8]))
+        st_country.set(row[9] or "")
+        st_taxid.set(row[10] or "")
         location_label = ""
         for label, loc_id in location_option_map.items():
-            if v[12] and label.startswith(f"{v[12]} ("):
+            if row[11] and label.startswith(f"{row[11]} ("):
                 location_label = label
                 break
         st_location.set(location_label)
-        if v[13]:
-            st_birthday.set_date(v[13])
-        st_newsletter.set(v[15] if len(v) > 15 else True)
+        if row[12]:
+            st_birthday.set_date(row[12])
+        st_newsletter.set(row[13] if row[13] is not None else True)
+        st_is_minor.set(bool(row[14]))
+        st_guardian_name.set(row[15] or "")
+        st_guardian_email.set(row[16] or "")
+        st_guardian_phone.set(row[17] or "")
+        st_guardian_phone2.set(row[18] or "")
+        st_guardian_relationship.set(row[19] or "")
 
         update_button_states()
 
@@ -580,7 +701,7 @@ def build(tab_students):
         if not rows:
             students_tree.insert(
                 "", tk.END,
-                values=("", t("label.no_data"), "", "", "", "", "", "", "", "", "", "", "", "", "", ""),
+                values=("", "", t("label.no_data"), "", "", "", "", "", "", "", "", "", "", "", "", "", ""),
                 tags=("inactive",)
             )
             lbl_page.config(text=t("label.page", page=1, pages=1))
@@ -588,11 +709,30 @@ def build(tab_students):
 
         for row in rows:
             active = row[14]
+            is_minor = row[15]
             status = t("label.active") if active else t("label.inactive")
             tag = "active" if active else "inactive"
             students_tree.insert(
                 "", tk.END,
-                values=row[:14] + (status, t("label.yes") if row[15] else t("label.no")),
+                values=(
+                    row[0],
+                    "🙂" if is_minor else "",
+                    row[1],
+                    row[2],
+                    row[3],
+                    row[4],
+                    row[5],
+                    row[6],
+                    row[7],
+                    row[8],
+                    row[9],
+                    row[10],
+                    row[11],
+                    row[12],
+                    row[13],
+                    status,
+                    t("label.yes") if row[16] else t("label.no"),
+                ),
                 tags=(tag,)
             )
 

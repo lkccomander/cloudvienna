@@ -19,6 +19,12 @@ def validate_email(email):
         raise ValidationError("Invalid email format")
 
 
+def validate_optional_email(email):
+    if email is None or str(email).strip() == "":
+        return
+    validate_email(email)
+
+
 def validate_weight(weight):
     if weight is None or weight == "":
         return
