@@ -375,6 +375,7 @@ def build(tab_reports):
                    CASE WHEN s.is_minor THEN s.guardian_phone ELSE s.phone END AS contact_phone,
                    l.name AS location,
                    s.newsletter_opt_in,
+                   s.is_minor,
                    s.active
             FROM t_students s
             LEFT JOIN t_locations l ON s.location_id = l.id
@@ -385,7 +386,7 @@ def build(tab_reports):
 
         results_tree.delete(*results_tree.get_children())
         if not rows:
-            results_tree.insert("", tk.END, values=(t("label.no_data"), "", "", "", "", "", "", ""))
+            results_tree.insert("", tk.END, values=(t("label.no_data"), "", "", "", "", "", "", "", ""))
             results_btn.config(text=t("label.results", count=0))
             last_query_lbl.config(text=t("label.last_query", time=datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
             export_btn.config(state="disabled")
@@ -395,7 +396,17 @@ def build(tab_reports):
             results_tree.insert(
                 "",
                 tk.END,
-                values=r[:6] + (t("label.yes") if r[6] else t("label.no"), t("label.active") if r[7] else t("label.inactive"))
+                values=(
+                    r[1],  # name
+                    r[2],  # contact_name
+                    r[3],  # contact_email
+                    r[4],  # contact_phone
+                    r[5],  # location
+                    t("label.yes") if r[6] else t("label.no"),  # newsletter
+                    t("label.yes") if r[7] else t("label.no"),  # is_minor
+                    t("label.active") if r[8] else t("label.inactive"),  # status
+                    r[0],  # type
+                )
             )
         results_btn.config(text=t("label.results", count=total_rows["value"]))
         last_query_lbl.config(text=t("label.last_query", time=datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
@@ -408,18 +419,19 @@ def build(tab_reports):
 
     results_tree = ttk.Treeview(
         results_frame,
-        columns=("type", "name", "contact_name", "contact_email", "contact_phone", "location", "newsletter", "status"),
+        columns=("name", "contact_name", "contact_email", "contact_phone", "location", "newsletter", "is_minor", "status", "type"),
         show="headings"
     )
     header_map = {
-        "type": "label.type",
         "name": "label.name",
         "contact_name": "label.contact_name",
         "contact_email": "label.contact_email",
         "contact_phone": "label.contact_phone",
         "location": "label.location",
         "newsletter": "label.newsletter",
+        "is_minor": "label.is_minor",
         "status": "label.status",
+        "type": "label.type",
     }
     for c in results_tree["columns"]:
         results_tree.heading(c, text=t(header_map.get(c, c)))
