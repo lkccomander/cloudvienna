@@ -348,7 +348,10 @@ def build(tab_students):
 
     # Render the total students line chart.
     def draw_total_line():
-        total = count_students_total()
+        stats = count_students_by_status()
+        active = stats.get(True, 0)
+        inactive = stats.get(False, 0)
+        total = active + inactive
 
         fig = Figure(figsize=(3.2, 3.2), dpi=100)
         ax = fig.add_subplot(111)
@@ -358,10 +361,14 @@ def build(tab_students):
             ax.set_title(t("label.total_students"))
             ax.axis("off")
         else:
-            ax.plot([0, 1], [0, total], marker="o")
+            x = [0, 1]
+            ax.plot(x, [0, total], marker="o", color="blue", label=f"{t('label.total_students')} ({total})")
+            ax.plot(x, [0, inactive], marker="o", color="red", label=f"{t('label.inactive')} ({inactive})")
+            ax.plot(x, [0, active], marker="o", color="green", label=f"{t('label.active')} ({active})")
             ax.set_title(t("label.total_students"))
             ax.set_ylabel(t("label.count"))
             ax.set_xticks([])
+            ax.legend(loc="best")
 
         canvas = FigureCanvasTkAgg(fig, master=chart_right)
         canvas.draw()
