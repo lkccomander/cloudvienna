@@ -23,6 +23,7 @@ app_settings.json
 # Builds
 dist/
 build/
+.venv312/
 *.exe
 
 # IDE

@@ -29,6 +29,24 @@ def default_newsletter_opt_in():
     return True
 
 
+def sex_to_db(value):
+    normalized = (value or "").strip().lower()
+    if normalized in ("male", "m"):
+        return "M"
+    if normalized in ("female", "f"):
+        return "F"
+    return None
+
+
+def sex_from_db(value):
+    normalized = (value or "").strip().upper()
+    if normalized == "M":
+        return "Male"
+    if normalized == "F":
+        return "Female"
+    return ""
+
+
 def build(tab_students):
     #ttk.Label(tab_students, text="STUDENTS TAB OK", foreground="green").grid(
      #   row=0, column=0, columnspan=3, sticky="w", padx=10, pady=10
@@ -202,7 +220,7 @@ def build(tab_students):
     # =====================================================
     fields = [
         ("Name", st_name),
-        ("Sex", st_sex),
+        ("Genre", st_sex),
         ("Direction", st_direction),
         ("Postal Code", st_postalcode),
         ("Belt", st_belt),
@@ -216,7 +234,7 @@ def build(tab_students):
     ]
     label_map = {
         "Name": "label.name",
-        "Sex": "label.sex",
+        "Genre": "label.genre",
         "Direction": "label.direction",
         "Postal Code": "label.postalcode",
         "Belt": "label.belt",
@@ -238,10 +256,10 @@ def build(tab_students):
                 values=["White", "Blue", "Purple", "Brown", "Black"],
                 state="readonly", width=25
             ).grid(row=i, column=1)
-        elif lbl == "Sex":
+        elif lbl == "Genre":
             ttk.Combobox(
                 form, textvariable=var,
-                values=["Male", "Female", "Other"],
+                values=["Male", "Female"],
                 state="readonly", width=25
             ).grid(row=i, column=1)
         elif lbl == "Location":
@@ -390,6 +408,9 @@ def build(tab_students):
     def register_student():
         try:
             validate_required(st_name.get(), "Name")
+            sex_db = sex_to_db(st_sex.get())
+            if not sex_db:
+                raise ValidationError("Select Male or Female")
             validate_weight(st_weight.get())
             print(st_weight.get(st_weight.get()))
             validate_birthday(st_birthday.get_date())
@@ -412,7 +433,7 @@ def build(tab_students):
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (
                 st_name.get(),
-                st_sex.get(),
+                sex_db,
                 st_direction.get(),
                 st_postalcode.get(),
                 st_belt.get(),
@@ -451,6 +472,9 @@ def build(tab_students):
                 raise ValidationError("Select a student first")
 
             validate_required(st_name.get(), "Name")
+            sex_db = sex_to_db(st_sex.get())
+            if not sex_db:
+                raise ValidationError("Select Male or Female")
             validate_weight(st_weight.get())
             if st_is_minor.get():
                 validate_required(st_guardian_name.get(), "Guardian Name")
@@ -474,7 +498,7 @@ def build(tab_students):
                 WHERE id=%s
             """, (
                 st_name.get(),
-                st_sex.get(),
+                sex_db,
                 st_direction.get(),
                 st_postalcode.get(),
                 st_belt.get(),
@@ -660,7 +684,7 @@ def build(tab_students):
         row = row[0]
 
         st_name.set(row[0])
-        st_sex.set(row[1])
+        st_sex.set(sex_from_db(row[1]))
         st_direction.set(row[2])
         st_postalcode.set(row[3])
         st_belt.set(row[4])

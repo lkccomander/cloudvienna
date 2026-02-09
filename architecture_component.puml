@@ -1,0 +1,100 @@
+@startuml
+title BJJ Vienna - Component Diagram
+
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+actor "User" as user
+
+package "Desktop App (Tkinter)" {
+  [gui.py\n(main window + tabs)] as gui
+  [ui.students] as ui_students
+  [ui.teachers] as ui_teachers
+  [ui.locations] as ui_locations
+  [ui.sessions] as ui_sessions
+  [ui.attendance] as ui_attendance
+  [ui.news_notifications] as ui_news
+  [ui.reports] as ui_reports
+  [ui.settings] as ui_settings
+  [ui.about] as ui_about
+
+  [db.py\nexecute(query, params)] as db
+  [i18n.py\ntranslations + language persistence] as i18n
+  [validation_middleware.py] as validation
+  [error_middleware.py] as errors
+  [version.py] as version
+}
+
+package "Optional Service Layer" {
+  [main.py\nFastAPI attendance endpoints] as api
+}
+
+database "PostgreSQL" as pg
+collections "i18n/*.json" as i18n_files
+collections "app_settings.json" as settings
+collections ".env* + keyring" as env_cfg
+collections "app.log" as logs
+collections "CSV/PDF/XLSX exports" as exports
+
+user --> gui
+
+gui --> ui_students
+gui --> ui_teachers
+gui --> ui_locations
+gui --> ui_sessions
+gui --> ui_attendance
+gui --> ui_news
+gui --> ui_reports
+gui --> ui_settings
+gui --> ui_about
+gui --> version
+
+ui_students --> db
+ui_teachers --> db
+ui_locations --> db
+ui_sessions --> db
+ui_attendance --> db
+ui_news --> db
+ui_reports --> db
+
+ui_students --> validation
+ui_teachers --> validation
+ui_locations --> validation
+ui_sessions --> validation
+
+ui_students --> errors
+ui_teachers --> errors
+ui_locations --> errors
+ui_sessions --> errors
+
+gui --> i18n
+ui_students --> i18n
+ui_teachers --> i18n
+ui_locations --> i18n
+ui_sessions --> i18n
+ui_attendance --> i18n
+ui_news --> i18n
+ui_reports --> i18n
+ui_settings --> i18n
+ui_about --> i18n
+
+db --> pg
+db --> env_cfg
+i18n --> i18n_files
+i18n --> settings
+ui_about --> settings
+gui --> logs
+errors --> logs
+ui_about --> logs
+ui_reports --> exports
+
+api --> db
+api --> pg
+
+note right of api
+  Service is present in repo and can run separately.
+  Desktop app is the primary runtime entry point.
+end note
+
+@enduml
