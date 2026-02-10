@@ -5,6 +5,7 @@ from validation_middleware import (
     ValidationError,
     validate_required,
     validate_email,
+    validate_optional_email,
     validate_weight,
     validate_birthday,
 )
