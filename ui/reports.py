@@ -8,7 +8,7 @@ from db import execute
 from i18n import t
 
 
-def build_student_filters(term, location_id, consent_value, status_value, is_minor_only):
+def build_student_filters(term, location_id, consent_value, status_value, is_minor_only, member_for_days):
     term = (term or "").strip()
     params = []
     where_clauses = []
@@ -26,6 +26,10 @@ def build_student_filters(term, location_id, consent_value, status_value, is_min
 
     if is_minor_only:
         where_clauses.append("s.is_minor = TRUE")
+
+    if member_for_days is not None:
+        where_clauses.append("s.created_at <= now() - (%s * interval '1 day')")
+        params.append(member_for_days)
 
     location_filter = ""
     if location_id == "NONE":
@@ -85,6 +89,7 @@ def build(tab_reports):
     consent_var = tk.StringVar(value=t("label.all"))
     status_var = tk.StringVar(value=t("label.all"))
     is_minor_only_var = tk.BooleanVar(value=False)
+    membership_duration_var = tk.StringVar(value=t("label.all"))
 
     consent_options = {
         t("label.all"): None,
@@ -95,6 +100,11 @@ def build(tab_reports):
         t("label.all"): None,
         t("label.active"): True,
         t("label.inactive"): False,
+    }
+    membership_duration_options = {
+        t("label.all"): None,
+        t("label.more_than_2_weeks"): 14,
+        t("label.more_than_4_weeks"): 28,
     }
 
     ttk.Label(filters_frame, text=t("label.consent")).grid(row=0, column=0, sticky="w")
@@ -123,7 +133,17 @@ def build(tab_reports):
         variable=is_minor_only_var,
     ).grid(row=0, column=4, sticky="w", padx=(16, 0))
 
-    filters_frame.columnconfigure(5, weight=1)
+    ttk.Label(filters_frame, text=t("label.membership_duration")).grid(row=0, column=5, sticky="w", padx=(16, 0))
+    membership_duration_cb = ttk.Combobox(
+        filters_frame,
+        textvariable=membership_duration_var,
+        state="readonly",
+        width=20,
+        values=list(membership_duration_options.keys()),
+    )
+    membership_duration_cb.grid(row=0, column=6, sticky="w", padx=(6, 0))
+
+    filters_frame.columnconfigure(7, weight=1)
 
     export_frame = ttk.LabelFrame(report_frame, text=t("label.export"), padding=6)
     export_frame.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(6, 0))
@@ -159,6 +179,7 @@ def build(tab_reports):
         location_id = location_map.get(location_key)
         consent_value = consent_options.get(consent_var.get())
         status_value = status_options.get(status_var.get())
+        membership_duration_days = membership_duration_options.get(membership_duration_var.get())
 
         where_sql, params = build_student_filters(
             term,
@@ -166,6 +187,7 @@ def build(tab_reports):
             consent_value,
             status_value,
             is_minor_only_var.get(),
+            membership_duration_days,
         )
 
         return term, (where_sql, params)
