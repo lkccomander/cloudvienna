@@ -189,6 +189,35 @@ class AttendanceRow(BaseModel):
     c3: str
 
 
+class ReportsStudentSearchIn(BaseModel):
+    term: str = ""
+    location_id: Optional[int] = None
+    no_location: bool = False
+    consent_value: Optional[bool] = None
+    status_value: Optional[bool] = None
+    is_minor_only: bool = False
+    member_for_days: Optional[int] = None
+    limit: int = Field(default=50, ge=1, le=500)
+    offset: int = Field(default=0, ge=0)
+
+
+class ReportsStudentRow(BaseModel):
+    type: str = "Student"
+    name: Optional[str] = None
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    location: Optional[str] = None
+    newsletter_opt_in: Optional[bool] = None
+    is_minor: Optional[bool] = None
+    active: Optional[bool] = None
+
+
+class ReportsStudentSearchOut(BaseModel):
+    total: int
+    rows: list[ReportsStudentRow]
+
+
 class StudentDetailOut(BaseModel):
     id: int
     name: Optional[str] = None

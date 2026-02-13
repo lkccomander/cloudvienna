@@ -4,6 +4,13 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
 
+from api_client import (
+    ApiError,
+    is_api_configured,
+    list_locations as api_list_locations,
+    reports_students_export as api_reports_students_export,
+    reports_students_search as api_reports_students_search,
+)
 from db import execute
 from i18n import t
 
@@ -192,7 +199,36 @@ def build(tab_reports):
 
         return term, (where_sql, params)
 
-    def _export_query_rows(where_sql, params):
+    def _build_filter_payload():
+        location_key = location_var.get()
+        location_id = location_map.get(location_key)
+        return {
+            "term": search_var.get().strip(),
+            "location_id": None if location_id in (None, "NONE") else int(location_id),
+            "no_location": location_id == "NONE",
+            "consent_value": consent_options.get(consent_var.get()),
+            "status_value": status_options.get(status_var.get()),
+            "is_minor_only": bool(is_minor_only_var.get()),
+            "member_for_days": membership_duration_options.get(membership_duration_var.get()),
+        }
+
+    def _export_query_rows(where_sql=None, params=None, api_payload=None):
+        if is_api_configured():
+            payload = api_payload or _build_filter_payload()
+            rows = api_reports_students_export(payload)
+            return [
+                (
+                    r.get("type", "Student"),
+                    r.get("name"),
+                    r.get("contact_name"),
+                    r.get("contact_email"),
+                    r.get("contact_phone"),
+                    r.get("location"),
+                    r.get("newsletter_opt_in"),
+                    r.get("active"),
+                )
+                for r in rows
+            ]
         return execute(f"""
             SELECT 'Student' AS type,
                    s.name AS student_name,
@@ -209,7 +245,7 @@ def build(tab_reports):
             LEFT JOIN t_locations l ON s.location_id = l.id
             {where_sql}
             ORDER BY s.name
-        """, tuple(params))
+        """, tuple(params or ()))
 
     def _project_root():
         return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -328,8 +364,12 @@ def build(tab_reports):
     def export_results():
         if last_filter_data["value"] is None:
             return
-        where_sql, params = last_filter_data["value"]
-        rows = _export_query_rows(where_sql, params)
+        if is_api_configured():
+            payload = last_filter_data["value"] if isinstance(last_filter_data["value"], dict) else _build_filter_payload()
+            rows = _export_query_rows(api_payload=payload)
+        else:
+            where_sql, params = last_filter_data["value"]
+            rows = _export_query_rows(where_sql, params)
         if not rows:
             messagebox.showinfo(t("label.export"), t("label.no_data"))
             return
@@ -366,10 +406,24 @@ def build(tab_reports):
             results_tree.delete(*results_tree.get_children())
             results_btn.config(text=t("label.results", count=0))
             last_query_lbl.config(text=t("label.last_query", time="--"))
+        current_page["value"] = 0
+        if is_api_configured():
+            payload = _build_filter_payload()
+            payload["limit"] = PAGE_SIZE
+            payload["offset"] = 0
+            try:
+                response = api_reports_students_search(payload)
+            except ApiError as ae:
+                messagebox.showerror("API error", str(ae))
+                return
+            last_filter_data["value"] = _build_filter_payload()
+            total_rows["value"] = int(response.get("total", 0))
+            export_btn.config(state="normal" if total_rows["value"] > 0 else "disabled")
+            _load_page()
+            return
+
         location_filter, params = filter_data
         last_filter_data["value"] = (location_filter, params)
-        current_page["value"] = 0
-
         count = execute(f"""
             SELECT COUNT(*)
             FROM t_students s
@@ -380,31 +434,57 @@ def build(tab_reports):
         _load_page()
 
     def _load_page():
-        term, filter_data = _build_filters()
-        if filter_data is None:
-            return
-        location_filter, params = filter_data
-        offset = current_page["value"] * PAGE_SIZE
+        if is_api_configured():
+            filter_payload = last_filter_data["value"] or _build_filter_payload()
+            payload = dict(filter_payload)
+            payload["limit"] = PAGE_SIZE
+            payload["offset"] = current_page["value"] * PAGE_SIZE
+            try:
+                response = api_reports_students_search(payload)
+            except ApiError as ae:
+                messagebox.showerror("API error", str(ae))
+                return
+            rows = [
+                (
+                    r.get("type", "Student"),
+                    r.get("name"),
+                    r.get("contact_name"),
+                    r.get("contact_email"),
+                    r.get("contact_phone"),
+                    r.get("location"),
+                    r.get("newsletter_opt_in"),
+                    r.get("is_minor"),
+                    r.get("active"),
+                )
+                for r in response.get("rows", [])
+            ]
+            total_rows["value"] = int(response.get("total", total_rows["value"]))
+        else:
+            term, filter_data = _build_filters()
+            if filter_data is None:
+                return
+            location_filter, params = filter_data
+            offset = current_page["value"] * PAGE_SIZE
 
-        rows = execute(f"""
-            SELECT 'Student' AS type,
-                   s.name AS student_name,
-                   CASE
-                       WHEN s.is_minor THEN COALESCE(NULLIF(s.guardian_name, ''), s.name)
-                       ELSE s.name
-                   END AS contact_name,
-                   CASE WHEN s.is_minor THEN s.guardian_email ELSE s.email END AS contact_email,
-                   CASE WHEN s.is_minor THEN s.guardian_phone ELSE s.phone END AS contact_phone,
-                   l.name AS location,
-                   s.newsletter_opt_in,
-                   s.is_minor,
-                   s.active
-            FROM t_students s
-            LEFT JOIN t_locations l ON s.location_id = l.id
-            {location_filter}
-            ORDER BY s.name
-            LIMIT %s OFFSET %s
-        """, tuple(params + [PAGE_SIZE, offset]))
+            rows = execute(f"""
+                SELECT 'Student' AS type,
+                       s.name AS student_name,
+                       CASE
+                           WHEN s.is_minor THEN COALESCE(NULLIF(s.guardian_name, ''), s.name)
+                           ELSE s.name
+                       END AS contact_name,
+                       CASE WHEN s.is_minor THEN s.guardian_email ELSE s.email END AS contact_email,
+                       CASE WHEN s.is_minor THEN s.guardian_phone ELSE s.phone END AS contact_phone,
+                       l.name AS location,
+                       s.newsletter_opt_in,
+                       s.is_minor,
+                       s.active
+                FROM t_students s
+                LEFT JOIN t_locations l ON s.location_id = l.id
+                {location_filter}
+                ORDER BY s.name
+                LIMIT %s OFFSET %s
+            """, tuple(params + [PAGE_SIZE, offset]))
 
         results_tree.delete(*results_tree.get_children())
         if not rows:
@@ -480,11 +560,21 @@ def build(tab_reports):
         _load_page()
 
     def refresh_locations():
-        rows = execute("""
-            SELECT id, name
-            FROM t_locations
-            ORDER BY name
-        """)
+        location_map.clear()
+        location_map[all_locations_label] = None
+        location_map[no_location_label] = "NONE"
+        if is_api_configured():
+            try:
+                rows = [(r.get("id"), r.get("name")) for r in api_list_locations()]
+            except ApiError as ae:
+                messagebox.showerror("API error", str(ae))
+                rows = []
+        else:
+            rows = execute("""
+                SELECT id, name
+                FROM t_locations
+                ORDER BY name
+            """)
         options = [all_locations_label, no_location_label]
         for loc_id, name in rows:
             label = f"{name} (#{loc_id})"

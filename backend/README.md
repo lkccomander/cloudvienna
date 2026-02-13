@@ -39,6 +39,8 @@ This is the first backend scaffold to remove direct DB access from the GUI clien
 - `POST /attendance/register`
 - `GET /attendance/by-session/{id}`
 - `GET /attendance/by-student/{id}`
+- `POST /reports/students/search`
+- `POST /reports/students/export`
 
 ## Environment variables
 

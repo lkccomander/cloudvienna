@@ -18,6 +18,9 @@ from backend.schemas import (
     LocationCreateResponse,
     LocationIn,
     LocationOut,
+    ReportsStudentRow,
+    ReportsStudentSearchIn,
+    ReportsStudentSearchOut,
     SessionIn,
     SessionOut,
     TeacherCreateResponse,
@@ -137,9 +140,110 @@ def _require_auth(
     return verify_access_token(credentials.credentials)
 
 
+def _build_reports_student_filters(payload: ReportsStudentSearchIn):
+    params = []
+    where_clauses = []
+    term = (payload.term or "").strip()
+    if term:
+        where_clauses.append("s.name ILIKE %s")
+        params.append(f"%{term}%")
+
+    if payload.consent_value is not None:
+        where_clauses.append("s.newsletter_opt_in = %s")
+        params.append(payload.consent_value)
+
+    if payload.status_value is not None:
+        where_clauses.append("s.active = %s")
+        params.append(payload.status_value)
+
+    if payload.is_minor_only:
+        where_clauses.append("s.is_minor = TRUE")
+
+    if payload.member_for_days is not None:
+        where_clauses.append("s.created_at <= now() - (%s * interval '1 day')")
+        params.append(payload.member_for_days)
+
+    if payload.no_location:
+        where_clauses.append("s.location_id IS NULL")
+    elif payload.location_id is not None:
+        where_clauses.append("s.location_id = %s")
+        params.append(payload.location_id)
+
+    if where_clauses:
+        return " WHERE " + " AND ".join(where_clauses), params
+    return " WHERE 1=1", params
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.post("/reports/students/search", response_model=ReportsStudentSearchOut)
+def reports_students_search(payload: ReportsStudentSearchIn, _: str = Depends(_require_auth)):
+    where_sql, params = _build_reports_student_filters(payload)
+    count_row = fetch_all(
+        f"""
+        SELECT COUNT(*) AS total
+        FROM t_students s
+        {where_sql}
+        """,
+        tuple(params),
+    )[0]
+    total = int(count_row["total"])
+    rows = fetch_all(
+        f"""
+        SELECT 'Student' AS type,
+               s.name AS name,
+               CASE
+                   WHEN s.is_minor THEN COALESCE(NULLIF(s.guardian_name, ''), s.name)
+                   ELSE s.name
+               END AS contact_name,
+               CASE WHEN s.is_minor THEN s.guardian_email ELSE s.email END AS contact_email,
+               CASE WHEN s.is_minor THEN s.guardian_phone ELSE s.phone END AS contact_phone,
+               l.name AS location,
+               s.newsletter_opt_in,
+               s.is_minor,
+               s.active
+        FROM t_students s
+        LEFT JOIN t_locations l ON s.location_id = l.id
+        {where_sql}
+        ORDER BY s.name
+        LIMIT %s OFFSET %s
+        """,
+        tuple(params + [payload.limit, payload.offset]),
+    )
+    return ReportsStudentSearchOut(
+        total=total,
+        rows=[ReportsStudentRow.model_validate(r) for r in rows],
+    )
+
+
+@app.post("/reports/students/export", response_model=list[ReportsStudentRow])
+def reports_students_export(payload: ReportsStudentSearchIn, _: str = Depends(_require_auth)):
+    where_sql, params = _build_reports_student_filters(payload)
+    rows = fetch_all(
+        f"""
+        SELECT 'Student' AS type,
+               s.name AS name,
+               CASE
+                   WHEN s.is_minor THEN COALESCE(NULLIF(s.guardian_name, ''), s.name)
+                   ELSE s.name
+               END AS contact_name,
+               CASE WHEN s.is_minor THEN s.guardian_email ELSE s.email END AS contact_email,
+               CASE WHEN s.is_minor THEN s.guardian_phone ELSE s.phone END AS contact_phone,
+               l.name AS location,
+               s.newsletter_opt_in,
+               s.is_minor,
+               s.active
+        FROM t_students s
+        LEFT JOIN t_locations l ON s.location_id = l.id
+        {where_sql}
+        ORDER BY s.name
+        """,
+        tuple(params),
+    )
+    return [ReportsStudentRow.model_validate(r) for r in rows]
 
 
 @app.post("/auth/login", response_model=TokenResponse)

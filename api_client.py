@@ -250,3 +250,11 @@ def attendance_by_session(session_id):
 
 def attendance_by_student(student_id):
     return _with_auth_request("GET", f"/attendance/by-student/{int(student_id)}")
+
+
+def reports_students_search(payload):
+    return _with_auth_request("POST", "/reports/students/search", payload=payload)
+
+
+def reports_students_export(payload):
+    return _with_auth_request("POST", "/reports/students/export", payload=payload)
