@@ -238,3 +238,15 @@ def cancel_session(session_id):
 
 def restore_session(session_id):
     return _with_auth_request("POST", f"/sessions/{int(session_id)}/restore")
+
+
+def register_attendance(payload):
+    return _with_auth_request("POST", "/attendance/register", payload=payload)
+
+
+def attendance_by_session(session_id):
+    return _with_auth_request("GET", f"/attendance/by-session/{int(session_id)}")
+
+
+def attendance_by_student(student_id):
+    return _with_auth_request("GET", f"/attendance/by-student/{int(student_id)}")

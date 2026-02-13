@@ -8,6 +8,8 @@ from backend.config import (
 )
 from backend.db import execute, execute_returning_one, fetch_all
 from backend.schemas import (
+    AttendanceRegisterIn,
+    AttendanceRow,
     ClassIn,
     ClassOut,
     CountResponse,
@@ -551,6 +553,55 @@ def restore_session(session_id: int, _: str = Depends(_require_auth)):
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
     return {"status": "ok", "id": row["id"], "cancelled": False}
+
+
+@app.post("/attendance/register")
+def register_attendance(payload: AttendanceRegisterIn, _: str = Depends(_require_auth)):
+    execute(
+        """
+        INSERT INTO t_attendance (session_id, student_id, status, checkin_source)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT DO NOTHING
+        """,
+        (
+            payload.session_id,
+            payload.student_id,
+            payload.status.strip(),
+            payload.source.strip(),
+        ),
+    )
+    return {"status": "ok"}
+
+
+@app.get("/attendance/by-session/{session_id}", response_model=list[AttendanceRow])
+def attendance_by_session(session_id: int, _: str = Depends(_require_auth)):
+    rows = fetch_all(
+        """
+        SELECT st.name AS c1, a.status AS c2, a.checkin_time::text AS c3
+        FROM t_attendance a
+        JOIN t_students st ON a.student_id = st.id
+        WHERE a.session_id = %s
+        ORDER BY st.name
+        """,
+        (session_id,),
+    )
+    return [AttendanceRow(c1=str(r["c1"]), c2=str(r["c2"]), c3=str(r["c3"])) for r in rows]
+
+
+@app.get("/attendance/by-student/{student_id}", response_model=list[AttendanceRow])
+def attendance_by_student(student_id: int, _: str = Depends(_require_auth)):
+    rows = fetch_all(
+        """
+        SELECT c.name AS c1, cs.session_date::text AS c2, a.status AS c3
+        FROM t_attendance a
+        JOIN t_class_sessions cs ON a.session_id = cs.id
+        JOIN t_classes c ON cs.class_id = c.id
+        WHERE a.student_id = %s
+        ORDER BY cs.session_date DESC
+        """,
+        (student_id,),
+    )
+    return [AttendanceRow(c1=str(r["c1"]), c2=str(r["c2"]), c3=str(r["c3"])) for r in rows]
 
 
 @app.post("/students/create", response_model=StudentCreateResponse, status_code=201)

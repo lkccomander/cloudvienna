@@ -176,6 +176,19 @@ class SessionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AttendanceRegisterIn(BaseModel):
+    session_id: int
+    student_id: int
+    status: str = Field(min_length=1, max_length=30)
+    source: str = Field(min_length=1, max_length=30)
+
+
+class AttendanceRow(BaseModel):
+    c1: str
+    c2: str
+    c3: str
+
+
 class StudentDetailOut(BaseModel):
     id: int
     name: Optional[str] = None
