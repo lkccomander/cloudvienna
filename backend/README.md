@@ -7,6 +7,7 @@ This is the first backend scaffold to remove direct DB access from the GUI clien
 - `GET /health`
 - `POST /auth/login`
 - `GET /students/list`
+- `GET /students/count`
 - `POST /students/create`
 
 ## Environment variables
@@ -42,3 +43,16 @@ curl -s -X POST http://127.0.0.1:8000/auth/login \
   -d '{"username":"admin","password":"change-me"}'
 ```
 
+## GUI -> API config
+
+Add this block to your `app_settings.json` so the Students tab can use the API:
+
+```json
+{
+  "api": {
+    "base_url": "http://127.0.0.1:8000",
+    "username": "admin",
+    "password": "change-me"
+  }
+}
+```

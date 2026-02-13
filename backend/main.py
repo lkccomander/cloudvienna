@@ -6,8 +6,9 @@ from backend.config import (
     API_ADMIN_USER,
     API_TOKEN_MINUTES,
 )
-from backend.db import execute_returning_one, fetch_all
+from backend.db import execute, execute_returning_one, fetch_all
 from backend.schemas import (
+    CountResponse,
     LoginRequest,
     StudentCreateRequest,
     StudentCreateResponse,
@@ -19,6 +20,33 @@ from backend.security import create_access_token, verify_access_token
 
 app = FastAPI(title="BJJ Vienna API", version="0.1.0")
 auth_scheme = HTTPBearer(auto_error=True)
+
+
+@app.on_event("startup")
+def startup_migrations():
+    # Keep API resilient with legacy databases used by the current desktop app.
+    execute(
+        """
+        ALTER TABLE t_students
+        ADD COLUMN IF NOT EXISTS newsletter_opt_in boolean NOT NULL DEFAULT true
+        """
+    )
+    execute(
+        """
+        ALTER TABLE t_students
+        ADD COLUMN IF NOT EXISTS is_minor boolean NOT NULL DEFAULT false
+        """
+    )
+    execute(
+        """
+        ALTER TABLE t_students
+        ADD COLUMN IF NOT EXISTS guardian_name varchar(120),
+        ADD COLUMN IF NOT EXISTS guardian_email varchar(120),
+        ADD COLUMN IF NOT EXISTS guardian_phone varchar(50),
+        ADD COLUMN IF NOT EXISTS guardian_phone2 varchar(50),
+        ADD COLUMN IF NOT EXISTS guardian_relationship varchar(50)
+        """
+    )
 
 
 def _normalize_sex(value: str) -> str:
@@ -82,17 +110,48 @@ def list_students(
     _: str = Depends(_require_auth),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    status_filter: str = Query(default="Active"),
 ):
+    where = ""
+    if status_filter == "Active":
+        where = "WHERE s.active = true"
+    elif status_filter == "Inactive":
+        where = "WHERE s.active = false"
+
     rows = fetch_all(
-        """
-        SELECT id, name, sex, email, phone, birthday, active, created_at
-        FROM t_students
-        ORDER BY id
+        f"""
+        SELECT s.id, s.name, s.sex, s.direction, s.postalcode, s.belt, s.email, s.phone, s.phone2,
+               s.weight, s.country, s.taxid, l.name AS location, s.birthday, s.active, s.is_minor,
+               s.newsletter_opt_in, s.created_at
+        FROM t_students s
+        LEFT JOIN t_locations l ON s.location_id = l.id
+        {where}
+        ORDER BY s.id
         LIMIT %s OFFSET %s
         """,
         (limit, offset),
     )
     return [StudentOut.model_validate(row) for row in rows]
+
+
+@app.get("/students/count", response_model=CountResponse)
+def students_count(
+    _: str = Depends(_require_auth),
+    status_filter: str = Query(default="Active"),
+):
+    where = ""
+    if status_filter == "Active":
+        where = "WHERE s.active = true"
+    elif status_filter == "Inactive":
+        where = "WHERE s.active = false"
+    row = fetch_all(
+        f"""
+        SELECT COUNT(s.id) AS total
+        FROM t_students s
+        {where}
+        """
+    )[0]
+    return CountResponse(total=int(row["total"]))
 
 
 @app.post("/students/create", response_model=StudentCreateResponse, status_code=201)

@@ -7,6 +7,13 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from tkcalendar import DateEntry
 
+from api_client import (
+    ApiError,
+    count_students as api_count_students,
+    create_student as api_create_student,
+    is_api_configured,
+    list_students as api_list_students,
+)
 from db import execute
 from i18n import t
 from validation_middleware import (
@@ -103,9 +110,39 @@ def build(tab_students):
     # =====================================================
     # Fetch a page of students based on the active filter.
     def load_students_paged(page):
-        if filter_active.get() == "Active":
+        status_filter = filter_active.get()
+        if is_api_configured():
+            rows = api_list_students(
+                limit=PAGE_SIZE_STUDENTS,
+                offset=page * PAGE_SIZE_STUDENTS,
+                status_filter=status_filter,
+            )
+            return [
+                (
+                    r.get("id"),
+                    r.get("name"),
+                    r.get("sex"),
+                    r.get("direction"),
+                    r.get("postalcode"),
+                    r.get("belt"),
+                    r.get("email"),
+                    r.get("phone"),
+                    r.get("phone2"),
+                    r.get("weight"),
+                    r.get("country"),
+                    r.get("taxid"),
+                    r.get("location"),
+                    r.get("birthday"),
+                    r.get("active"),
+                    r.get("is_minor"),
+                    r.get("newsletter_opt_in"),
+                )
+                for r in rows
+            ]
+
+        if status_filter == "Active":
             where = "WHERE s.active = true"
-        elif filter_active.get() == "Inactive":
+        elif status_filter == "Inactive":
             where = "WHERE s.active = false"
         else:
             where = ""
@@ -122,9 +159,14 @@ def build(tab_students):
 
     # Count students based on the active filter for pagination.
     def count_students():
-        if filter_active.get() == "Active":
+        status_filter = filter_active.get()
+        if is_api_configured():
+            result = api_count_students(status_filter=status_filter)
+            return int(result.get("total", 0))
+
+        if status_filter == "Active":
             where = "WHERE s.active = true"
-        elif filter_active.get() == "Inactive":
+        elif status_filter == "Inactive":
             where = "WHERE s.active = false"
         else:
             where = ""
@@ -477,33 +519,59 @@ def build(tab_students):
             if not messagebox.askyesno("Confirm", "Register new student?"):
                 return
 
-            execute("""
-                INSERT INTO t_students
-                (name,sex,direction,postalcode,belt,email,phone,phone2,weight,country,taxid,birthday,location_id,newsletter_opt_in,
-                 is_minor,guardian_name,guardian_email,guardian_phone,guardian_phone2,guardian_relationship)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """, (
-                st_name.get(),
-                sex_db,
-                st_direction.get(),
-                st_postalcode.get(),
-                st_belt.get(),
-                st_email.get().strip(),
-                st_phone.get(),
-                st_phone2.get(),
-                float(st_weight.get()) if st_weight.get() else None,
-                st_country.get(),
-                st_taxid.get(),
-                st_birthday.get_date(),
-                location_option_map.get(st_location.get()),
-                st_newsletter.get(),
-                st_is_minor.get(),
-                st_guardian_name.get(),
-                st_guardian_email.get().strip(),
-                st_guardian_phone.get(),
-                st_guardian_phone2.get(),
-                st_guardian_relationship.get()
-            ))
+            if is_api_configured():
+                api_create_student(
+                    {
+                        "name": st_name.get(),
+                        "sex": sex_db,
+                        "direction": st_direction.get(),
+                        "postalcode": st_postalcode.get(),
+                        "belt": st_belt.get(),
+                        "email": st_email.get().strip(),
+                        "phone": st_phone.get(),
+                        "phone2": st_phone2.get(),
+                        "weight": float(st_weight.get()) if st_weight.get() else None,
+                        "country": st_country.get(),
+                        "taxid": st_taxid.get(),
+                        "birthday": st_birthday.get_date().isoformat() if st_birthday.get_date() else None,
+                        "location_id": location_option_map.get(st_location.get()),
+                        "newsletter_opt_in": st_newsletter.get(),
+                        "is_minor": st_is_minor.get(),
+                        "guardian_name": st_guardian_name.get(),
+                        "guardian_email": st_guardian_email.get().strip(),
+                        "guardian_phone": st_guardian_phone.get(),
+                        "guardian_phone2": st_guardian_phone2.get(),
+                        "guardian_relationship": st_guardian_relationship.get(),
+                    }
+                )
+            else:
+                execute("""
+                    INSERT INTO t_students
+                    (name,sex,direction,postalcode,belt,email,phone,phone2,weight,country,taxid,birthday,location_id,newsletter_opt_in,
+                     is_minor,guardian_name,guardian_email,guardian_phone,guardian_phone2,guardian_relationship)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                """, (
+                    st_name.get(),
+                    sex_db,
+                    st_direction.get(),
+                    st_postalcode.get(),
+                    st_belt.get(),
+                    st_email.get().strip(),
+                    st_phone.get(),
+                    st_phone2.get(),
+                    float(st_weight.get()) if st_weight.get() else None,
+                    st_country.get(),
+                    st_taxid.get(),
+                    st_birthday.get_date(),
+                    location_option_map.get(st_location.get()),
+                    st_newsletter.get(),
+                    st_is_minor.get(),
+                    st_guardian_name.get(),
+                    st_guardian_email.get().strip(),
+                    st_guardian_phone.get(),
+                    st_guardian_phone2.get(),
+                    st_guardian_relationship.get()
+                ))
 
             load_students_view()
             refresh_charts()
@@ -512,6 +580,8 @@ def build(tab_students):
         except ValidationError as ve:
             log_validation_error(ve, "register_student")
             messagebox.showerror("Validation error", str(ve))
+        except ApiError as ae:
+            messagebox.showerror("API error", str(ae))
         except Exception as e:
             handle_db_error(e, "register_student")
 
@@ -788,7 +858,11 @@ def build(tab_students):
         for r in students_tree.get_children():
             students_tree.delete(r)
 
-        rows = load_students_paged(current_student_page)
+        try:
+            rows = load_students_paged(current_student_page)
+        except ApiError as ae:
+            messagebox.showerror("API error", str(ae))
+            rows = []
         if not rows:
             students_tree.insert(
                 "", tk.END,
@@ -827,7 +901,11 @@ def build(tab_students):
                 tags=(tag,)
             )
 
-        total = count_students()
+        try:
+            total = count_students()
+        except ApiError as ae:
+            messagebox.showerror("API error", str(ae))
+            total = 0
         pages = max(1, (total + PAGE_SIZE_STUDENTS - 1) // PAGE_SIZE_STUDENTS)
         lbl_page.config(text=t("label.page", page=current_student_page + 1, pages=pages))
 

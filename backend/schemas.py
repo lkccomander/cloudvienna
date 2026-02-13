@@ -47,13 +47,26 @@ class StudentCreateResponse(BaseModel):
 
 class StudentOut(BaseModel):
     id: int
-    name: str
+    name: Optional[str] = None
     sex: Optional[str] = None
+    direction: Optional[str] = None
+    postalcode: Optional[str] = None
+    belt: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    phone2: Optional[str] = None
+    weight: Optional[float] = None
+    country: Optional[str] = None
+    taxid: Optional[str] = None
+    location: Optional[str] = None
     birthday: Optional[date] = None
-    active: bool
-    created_at: datetime
+    active: Optional[bool] = True
+    is_minor: Optional[bool] = False
+    newsletter_opt_in: Optional[bool] = True
+    created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
+
+class CountResponse(BaseModel):
+    total: int
