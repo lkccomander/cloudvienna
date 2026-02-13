@@ -9,10 +9,14 @@ from tkcalendar import DateEntry
 
 from api_client import (
     ApiError,
+    deactivate_student as api_deactivate_student,
     count_students as api_count_students,
     create_student as api_create_student,
+    get_student as api_get_student,
     is_api_configured,
     list_students as api_list_students,
+    reactivate_student as api_reactivate_student,
+    update_student as api_update_student,
 )
 from db import execute
 from i18n import t
@@ -609,37 +613,64 @@ def build(tab_students):
             if not messagebox.askyesno("Confirm", "Update selected student?"):
                 return
 
-            execute("""
-                UPDATE t_students
-                SET name=%s,sex=%s,direction=%s,postalcode=%s,belt=%s,email=%s,phone=%s,phone2=%s,
-                    weight=%s,country=%s,taxid=%s,location_id=%s,newsletter_opt_in=%s,
-                    is_minor=%s,guardian_name=%s,guardian_email=%s,guardian_phone=%s,guardian_phone2=%s,
-                    guardian_relationship=%s,
-                    birthday=%s,updated_at=now()
-                WHERE id=%s
-            """, (
-                st_name.get(),
-                sex_db,
-                st_direction.get(),
-                st_postalcode.get(),
-                st_belt.get(),
-                st_email.get().strip(),
-                st_phone.get(),
-                st_phone2.get(),
-                float(st_weight.get()) if st_weight.get() else None,
-                st_country.get(),
-                st_taxid.get(),
-                location_option_map.get(st_location.get()),
-                st_newsletter.get(),
-                st_is_minor.get(),
-                st_guardian_name.get(),
-                st_guardian_email.get().strip(),
-                st_guardian_phone.get(),
-                st_guardian_phone2.get(),
-                st_guardian_relationship.get(),
-                st_birthday.get_date(),
-                selected_student_id
-            ))
+            if is_api_configured():
+                api_update_student(
+                    selected_student_id,
+                    {
+                        "name": st_name.get(),
+                        "sex": sex_db,
+                        "direction": st_direction.get(),
+                        "postalcode": st_postalcode.get(),
+                        "belt": st_belt.get(),
+                        "email": st_email.get().strip(),
+                        "phone": st_phone.get(),
+                        "phone2": st_phone2.get(),
+                        "weight": float(st_weight.get()) if st_weight.get() else None,
+                        "country": st_country.get(),
+                        "taxid": st_taxid.get(),
+                        "birthday": st_birthday.get_date().isoformat() if st_birthday.get_date() else None,
+                        "location_id": location_option_map.get(st_location.get()),
+                        "newsletter_opt_in": st_newsletter.get(),
+                        "is_minor": st_is_minor.get(),
+                        "guardian_name": st_guardian_name.get(),
+                        "guardian_email": st_guardian_email.get().strip(),
+                        "guardian_phone": st_guardian_phone.get(),
+                        "guardian_phone2": st_guardian_phone2.get(),
+                        "guardian_relationship": st_guardian_relationship.get(),
+                    },
+                )
+            else:
+                execute("""
+                    UPDATE t_students
+                    SET name=%s,sex=%s,direction=%s,postalcode=%s,belt=%s,email=%s,phone=%s,phone2=%s,
+                        weight=%s,country=%s,taxid=%s,location_id=%s,newsletter_opt_in=%s,
+                        is_minor=%s,guardian_name=%s,guardian_email=%s,guardian_phone=%s,guardian_phone2=%s,
+                        guardian_relationship=%s,
+                        birthday=%s,updated_at=now()
+                    WHERE id=%s
+                """, (
+                    st_name.get(),
+                    sex_db,
+                    st_direction.get(),
+                    st_postalcode.get(),
+                    st_belt.get(),
+                    st_email.get().strip(),
+                    st_phone.get(),
+                    st_phone2.get(),
+                    float(st_weight.get()) if st_weight.get() else None,
+                    st_country.get(),
+                    st_taxid.get(),
+                    location_option_map.get(st_location.get()),
+                    st_newsletter.get(),
+                    st_is_minor.get(),
+                    st_guardian_name.get(),
+                    st_guardian_email.get().strip(),
+                    st_guardian_phone.get(),
+                    st_guardian_phone2.get(),
+                    st_guardian_relationship.get(),
+                    st_birthday.get_date(),
+                    selected_student_id
+                ))
 
             load_students_view()
             refresh_charts()
@@ -648,6 +679,8 @@ def build(tab_students):
         except ValidationError as ve:
             log_validation_error(ve, "update_student")
             messagebox.showerror("Validation error", str(ve))
+        except ApiError as ae:
+            messagebox.showerror("API error", str(ae))
         except Exception as e:
             handle_db_error(e, "update_student")
 
@@ -657,10 +690,17 @@ def build(tab_students):
             return
         if not messagebox.askyesno("Confirm", "Deactivate this student?"):
             return
-        execute("""
-            UPDATE t_students SET active=false, updated_at=now()
-            WHERE id=%s
-        """, (selected_student_id,))
+        if is_api_configured():
+            try:
+                api_deactivate_student(selected_student_id)
+            except ApiError as ae:
+                messagebox.showerror("API error", str(ae))
+                return
+        else:
+            execute("""
+                UPDATE t_students SET active=false, updated_at=now()
+                WHERE id=%s
+            """, (selected_student_id,))
         load_students_view()
         refresh_charts()
 
@@ -670,10 +710,17 @@ def build(tab_students):
             return
         if not messagebox.askyesno("Confirm", "Reactivate this student?"):
             return
-        execute("""
-            UPDATE t_students SET active=true, updated_at=now()
-            WHERE id=%s
-        """, (selected_student_id,))
+        if is_api_configured():
+            try:
+                api_reactivate_student(selected_student_id)
+            except ApiError as ae:
+                messagebox.showerror("API error", str(ae))
+                return
+        else:
+            execute("""
+                UPDATE t_students SET active=true, updated_at=now()
+                WHERE id=%s
+            """, (selected_student_id,))
         load_students_view()
         refresh_charts()
 
@@ -794,48 +841,102 @@ def build(tab_students):
         selected_student_id = v[0]
         selected_student_active = ("active" in item.get("tags", ()))
 
-        row = execute("""
-            SELECT s.name, s.sex, s.direction, s.postalcode, s.belt, s.email, s.phone, s.phone2,
-                   s.weight, s.country, s.taxid, l.name AS location, s.birthday, s.newsletter_opt_in,
-                   s.is_minor, s.guardian_name, s.guardian_email, s.guardian_phone, s.guardian_phone2,
-                   s.guardian_relationship, s.created_at
-            FROM t_students s
-            LEFT JOIN t_locations l ON s.location_id = l.id
-            WHERE s.id = %s
-        """, (selected_student_id,))
-        if not row:
-            return
-        row = row[0]
+        if is_api_configured():
+            try:
+                row = api_get_student(selected_student_id)
+            except ApiError as ae:
+                messagebox.showerror("API error", str(ae))
+                return
+            st_name.set(row.get("name") or "")
+            st_sex.set(sex_from_db(row.get("sex")))
+            st_direction.set(row.get("direction") or "")
+            st_postalcode.set(row.get("postalcode") or "")
+            st_belt.set(row.get("belt") or "")
+            st_email.set(row.get("email") or "")
+            st_phone.set(row.get("phone") or "")
+            st_phone2.set(row.get("phone2") or "")
+            st_weight.set("" if row.get("weight") is None else str(row.get("weight")))
+            st_country.set(row.get("country") or "")
+            st_taxid.set(row.get("taxid") or "")
+            row_location = row.get("location")
+            row_location_id = row.get("location_id")
+            row_birthday = row.get("birthday")
+            row_newsletter = row.get("newsletter_opt_in")
+            row_is_minor = row.get("is_minor")
+            row_guardian_name = row.get("guardian_name")
+            row_guardian_email = row.get("guardian_email")
+            row_guardian_phone = row.get("guardian_phone")
+            row_guardian_phone2 = row.get("guardian_phone2")
+            row_guardian_relationship = row.get("guardian_relationship")
+            row_created_at = row.get("created_at")
+            if isinstance(row_birthday, str):
+                try:
+                    row_birthday = date.fromisoformat(row_birthday)
+                except ValueError:
+                    row_birthday = None
+            if isinstance(row_created_at, str):
+                try:
+                    row_created_at = datetime.fromisoformat(row_created_at)
+                except ValueError:
+                    row_created_at = None
+        else:
+            row = execute("""
+                SELECT s.name, s.sex, s.direction, s.postalcode, s.belt, s.email, s.phone, s.phone2,
+                       s.weight, s.country, s.taxid, l.name AS location, s.birthday, s.newsletter_opt_in,
+                       s.is_minor, s.guardian_name, s.guardian_email, s.guardian_phone, s.guardian_phone2,
+                       s.guardian_relationship, s.created_at, s.location_id
+                FROM t_students s
+                LEFT JOIN t_locations l ON s.location_id = l.id
+                WHERE s.id = %s
+            """, (selected_student_id,))
+            if not row:
+                return
+            row = row[0]
 
-        st_name.set(row[0])
-        st_sex.set(sex_from_db(row[1]))
-        st_direction.set(row[2])
-        st_postalcode.set(row[3])
-        st_belt.set(row[4])
-        st_email.set(row[5] or "")
-        st_phone.set(row[6] or "")
-        st_phone2.set(row[7] or "")
-        st_weight.set("" if row[8] is None else str(row[8]))
-        st_country.set(row[9] or "")
-        st_taxid.set(row[10] or "")
+            st_name.set(row[0])
+            st_sex.set(sex_from_db(row[1]))
+            st_direction.set(row[2])
+            st_postalcode.set(row[3])
+            st_belt.set(row[4])
+            st_email.set(row[5] or "")
+            st_phone.set(row[6] or "")
+            st_phone2.set(row[7] or "")
+            st_weight.set("" if row[8] is None else str(row[8]))
+            st_country.set(row[9] or "")
+            st_taxid.set(row[10] or "")
+            row_location = row[11]
+            row_birthday = row[12]
+            row_newsletter = row[13]
+            row_is_minor = row[14]
+            row_guardian_name = row[15]
+            row_guardian_email = row[16]
+            row_guardian_phone = row[17]
+            row_guardian_phone2 = row[18]
+            row_guardian_relationship = row[19]
+            row_created_at = row[20]
+            row_location_id = row[21]
+
         location_label = ""
         for label, loc_id in location_option_map.items():
-            if row[11] and label.startswith(f"{row[11]} ("):
+            if row_location_id and label.endswith(f"(#{row_location_id})"):
+                location_label = label
+                break
+            if row_location and label.startswith(f"{row_location} ("):
                 location_label = label
                 break
         st_location.set(location_label)
-        if row[12]:
-            st_birthday.set_date(row[12])
+        if row_birthday:
+            st_birthday.set_date(row_birthday)
         _update_student_age_label()
-        st_newsletter.set(row[13] if row[13] is not None else True)
-        st_is_minor.set(bool(row[14]))
-        st_guardian_name.set(row[15] or "")
-        st_guardian_email.set(row[16] or "")
-        st_guardian_phone.set(row[17] or "")
-        st_guardian_phone2.set(row[18] or "")
-        st_guardian_relationship.set(row[19] or "")
-        if row[20]:
-            member_since["date"] = row[20].date() if isinstance(row[20], datetime) else row[20]
+        st_newsletter.set(row_newsletter if row_newsletter is not None else True)
+        st_is_minor.set(bool(row_is_minor))
+        st_guardian_name.set(row_guardian_name or "")
+        st_guardian_email.set(row_guardian_email or "")
+        st_guardian_phone.set(row_guardian_phone or "")
+        st_guardian_phone2.set(row_guardian_phone2 or "")
+        st_guardian_relationship.set(row_guardian_relationship or "")
+        if row_created_at:
+            member_since["date"] = row_created_at.date() if isinstance(row_created_at, datetime) else row_created_at
         else:
             member_since["date"] = None
         _update_student_academy_age_label()

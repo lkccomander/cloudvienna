@@ -131,3 +131,18 @@ def count_students(status_filter):
 def create_student(payload):
     return _with_auth_request("POST", "/students/create", payload=payload)
 
+
+def get_student(student_id):
+    return _with_auth_request("GET", f"/students/{int(student_id)}")
+
+
+def update_student(student_id, payload):
+    return _with_auth_request("PUT", f"/students/{int(student_id)}", payload=payload)
+
+
+def deactivate_student(student_id):
+    return _with_auth_request("POST", f"/students/{int(student_id)}/deactivate")
+
+
+def reactivate_student(student_id):
+    return _with_auth_request("POST", f"/students/{int(student_id)}/reactivate")

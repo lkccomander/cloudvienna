@@ -12,7 +12,9 @@ from backend.schemas import (
     LoginRequest,
     StudentCreateRequest,
     StudentCreateResponse,
+    StudentDetailOut,
     StudentOut,
+    StudentUpdateRequest,
     TokenResponse,
 )
 from backend.security import create_access_token, verify_access_token
@@ -195,3 +197,100 @@ def create_student(
         ),
     )
     return StudentCreateResponse.model_validate(row)
+
+
+@app.get("/students/{student_id}", response_model=StudentDetailOut)
+def get_student(student_id: int, _: str = Depends(_require_auth)):
+    rows = fetch_all(
+        """
+        SELECT s.id, s.name, s.sex, s.direction, s.postalcode, s.belt, s.email, s.phone, s.phone2,
+               s.weight, s.country, s.taxid, s.birthday, s.location_id, l.name AS location,
+               s.newsletter_opt_in, s.is_minor, s.guardian_name, s.guardian_email, s.guardian_phone,
+               s.guardian_phone2, s.guardian_relationship, s.active, s.created_at
+        FROM t_students s
+        LEFT JOIN t_locations l ON s.location_id = l.id
+        WHERE s.id = %s
+        """,
+        (student_id,),
+    )
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+    return StudentDetailOut.model_validate(rows[0])
+
+
+@app.put("/students/{student_id}", response_model=StudentCreateResponse)
+def update_student(
+    student_id: int,
+    payload: StudentUpdateRequest,
+    _: str = Depends(_require_auth),
+):
+    sex = _normalize_sex(payload.sex)
+    row = execute_returning_one(
+        """
+        UPDATE t_students
+        SET name=%s, sex=%s, direction=%s, postalcode=%s, belt=%s, email=%s, phone=%s, phone2=%s,
+            weight=%s, country=%s, taxid=%s, birthday=%s, location_id=%s, newsletter_opt_in=%s,
+            is_minor=%s, guardian_name=%s, guardian_email=%s, guardian_phone=%s, guardian_phone2=%s,
+            guardian_relationship=%s, updated_at=now()
+        WHERE id=%s
+        RETURNING id, created_at
+        """,
+        (
+            payload.name.strip(),
+            sex,
+            payload.direction,
+            payload.postalcode,
+            payload.belt,
+            payload.email.strip(),
+            payload.phone,
+            payload.phone2,
+            payload.weight,
+            payload.country,
+            payload.taxid,
+            payload.birthday,
+            payload.location_id,
+            payload.newsletter_opt_in,
+            payload.is_minor,
+            payload.guardian_name,
+            payload.guardian_email,
+            payload.guardian_phone,
+            payload.guardian_phone2,
+            payload.guardian_relationship,
+            student_id,
+        ),
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+    return StudentCreateResponse.model_validate(row)
+
+
+@app.post("/students/{student_id}/deactivate")
+def deactivate_student(student_id: int, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        """
+        UPDATE t_students
+        SET active=false, updated_at=now()
+        WHERE id=%s
+        RETURNING id
+        """,
+        (student_id,),
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+    return {"status": "ok", "id": row["id"], "active": False}
+
+
+@app.post("/students/{student_id}/reactivate")
+def reactivate_student(student_id: int, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        """
+        UPDATE t_students
+        SET active=true, updated_at=now()
+        WHERE id=%s
+        RETURNING id
+        """,
+        (student_id,),
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+    return {"status": "ok", "id": row["id"], "active": True}

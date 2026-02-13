@@ -38,6 +38,10 @@ class StudentCreateRequest(BaseModel):
     guardian_relationship: Optional[str] = None
 
 
+class StudentUpdateRequest(StudentCreateRequest):
+    pass
+
+
 class StudentCreateResponse(BaseModel):
     id: int
     created_at: datetime
@@ -70,3 +74,32 @@ class StudentOut(BaseModel):
 
 class CountResponse(BaseModel):
     total: int
+
+
+class StudentDetailOut(BaseModel):
+    id: int
+    name: Optional[str] = None
+    sex: Optional[str] = None
+    direction: Optional[str] = None
+    postalcode: Optional[str] = None
+    belt: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    phone2: Optional[str] = None
+    weight: Optional[float] = None
+    country: Optional[str] = None
+    taxid: Optional[str] = None
+    birthday: Optional[date] = None
+    location_id: Optional[int] = None
+    location: Optional[str] = None
+    newsletter_opt_in: Optional[bool] = True
+    is_minor: Optional[bool] = False
+    guardian_name: Optional[str] = None
+    guardian_email: Optional[str] = None
+    guardian_phone: Optional[str] = None
+    guardian_phone2: Optional[str] = None
+    guardian_relationship: Optional[str] = None
+    active: Optional[bool] = True
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)

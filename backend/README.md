@@ -8,7 +8,11 @@ This is the first backend scaffold to remove direct DB access from the GUI clien
 - `POST /auth/login`
 - `GET /students/list`
 - `GET /students/count`
+- `GET /students/{id}`
 - `POST /students/create`
+- `PUT /students/{id}`
+- `POST /students/{id}/deactivate`
+- `POST /students/{id}/reactivate`
 
 ## Environment variables
 
