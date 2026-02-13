@@ -81,6 +81,35 @@ class LocationOut(BaseModel):
     name: str
 
 
+class TeacherIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    sex: Optional[str] = None
+    email: str = Field(min_length=1, max_length=150)
+    phone: Optional[str] = None
+    belt: Optional[str] = None
+    hire_date: Optional[date] = None
+
+
+class TeacherOut(BaseModel):
+    id: int
+    name: Optional[str] = None
+    sex: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    belt: Optional[str] = None
+    hire_date: Optional[date] = None
+    active: Optional[bool] = True
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TeacherCreateResponse(BaseModel):
+    id: int
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class StudentDetailOut(BaseModel):
     id: int
     name: Optional[str] = None

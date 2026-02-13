@@ -150,3 +150,23 @@ def reactivate_student(student_id):
 
 def active_locations():
     return _with_auth_request("GET", "/locations/active")
+
+
+def list_teachers():
+    return _with_auth_request("GET", "/teachers/list")
+
+
+def create_teacher(payload):
+    return _with_auth_request("POST", "/teachers/create", payload=payload)
+
+
+def update_teacher(teacher_id, payload):
+    return _with_auth_request("PUT", f"/teachers/{int(teacher_id)}", payload=payload)
+
+
+def deactivate_teacher(teacher_id):
+    return _with_auth_request("POST", f"/teachers/{int(teacher_id)}/deactivate")
+
+
+def reactivate_teacher(teacher_id):
+    return _with_auth_request("POST", f"/teachers/{int(teacher_id)}/reactivate")

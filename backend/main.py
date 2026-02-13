@@ -11,6 +11,9 @@ from backend.schemas import (
     CountResponse,
     LoginRequest,
     LocationOut,
+    TeacherCreateResponse,
+    TeacherIn,
+    TeacherOut,
     StudentCreateRequest,
     StudentCreateResponse,
     StudentDetailOut,
@@ -153,6 +156,94 @@ def active_locations(_: str = Depends(_require_auth)):
         """
     )
     return [LocationOut.model_validate(row) for row in rows]
+
+
+@app.get("/teachers/list", response_model=list[TeacherOut])
+def list_teachers(_: str = Depends(_require_auth)):
+    rows = fetch_all(
+        """
+        SELECT id, name, sex, email, phone, belt, hire_date, active
+        FROM public.t_coaches
+        ORDER BY name
+        """
+    )
+    return [TeacherOut.model_validate(row) for row in rows]
+
+
+@app.post("/teachers/create", response_model=TeacherCreateResponse, status_code=201)
+def create_teacher(payload: TeacherIn, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        """
+        INSERT INTO public.t_coaches (name, sex, email, phone, belt, hire_date)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        RETURNING id, created_at
+        """,
+        (
+            payload.name.strip(),
+            payload.sex,
+            payload.email.strip(),
+            payload.phone,
+            payload.belt,
+            payload.hire_date,
+        ),
+    )
+    return TeacherCreateResponse.model_validate(row)
+
+
+@app.put("/teachers/{teacher_id}", response_model=TeacherCreateResponse)
+def update_teacher(teacher_id: int, payload: TeacherIn, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        """
+        UPDATE public.t_coaches
+        SET name=%s, sex=%s, email=%s, phone=%s, belt=%s, hire_date=%s, updated_at=now()
+        WHERE id=%s
+        RETURNING id, created_at
+        """,
+        (
+            payload.name.strip(),
+            payload.sex,
+            payload.email.strip(),
+            payload.phone,
+            payload.belt,
+            payload.hire_date,
+            teacher_id,
+        ),
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+    return TeacherCreateResponse.model_validate(row)
+
+
+@app.post("/teachers/{teacher_id}/deactivate")
+def deactivate_teacher(teacher_id: int, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        """
+        UPDATE public.t_coaches
+        SET active=false, updated_at=now()
+        WHERE id=%s
+        RETURNING id
+        """,
+        (teacher_id,),
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+    return {"status": "ok", "id": row["id"], "active": False}
+
+
+@app.post("/teachers/{teacher_id}/reactivate")
+def reactivate_teacher(teacher_id: int, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        """
+        UPDATE public.t_coaches
+        SET active=true, updated_at=now()
+        WHERE id=%s
+        RETURNING id
+        """,
+        (teacher_id,),
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+    return {"status": "ok", "id": row["id"], "active": True}
 
 
 @app.post("/students/create", response_model=StudentCreateResponse, status_code=201)

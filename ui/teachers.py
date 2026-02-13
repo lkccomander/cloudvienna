@@ -2,6 +2,15 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from tkcalendar import DateEntry
 
+from api_client import (
+    ApiError,
+    create_teacher as api_create_teacher,
+    deactivate_teacher as api_deactivate_teacher,
+    is_api_configured,
+    list_teachers as api_list_teachers,
+    reactivate_teacher as api_reactivate_teacher,
+    update_teacher as api_update_teacher,
+)
 from db import execute
 from i18n import t
 from validation_middleware import ValidationError, validate_required, validate_email
@@ -132,11 +141,30 @@ def build(tab_teachers):
     def load_teachers():
         teachers_tree.delete(*teachers_tree.get_children())
 
-        rows = execute("""
-            SELECT id, name, sex, email, phone, belt, hire_date, active
-            FROM public.t_coaches
-            ORDER BY name
-        """)
+        if is_api_configured():
+            try:
+                rows = [
+                    (
+                        r.get("id"),
+                        r.get("name"),
+                        r.get("sex"),
+                        r.get("email"),
+                        r.get("phone"),
+                        r.get("belt"),
+                        r.get("hire_date"),
+                        r.get("active"),
+                    )
+                    for r in api_list_teachers()
+                ]
+            except ApiError as e:
+                messagebox.showerror("API error", str(e))
+                rows = []
+        else:
+            rows = execute("""
+                SELECT id, name, sex, email, phone, belt, hire_date, active
+                FROM public.t_coaches
+                ORDER BY name
+            """)
 
         if not rows:
             teachers_tree.insert(
@@ -205,22 +233,34 @@ def build(tab_teachers):
             if hire_date_entry is None:
                 raise ValueError("Hire date widget missing")
 
-            execute("""
-                INSERT INTO public.t_coaches (name,sex,email,phone,belt,hire_date)
-                VALUES (%s,%s,%s,%s,%s,%s)
-            """, (
-                tc_name.get(),
-                tc_sex.get(),
-                tc_email.get().strip(),
-                tc_phone.get(),
-                tc_belt.get(),
-                hire_date_entry.get_date()
-            ))
+            if is_api_configured():
+                api_create_teacher({
+                    "name": tc_name.get(),
+                    "sex": tc_sex.get(),
+                    "email": tc_email.get().strip(),
+                    "phone": tc_phone.get(),
+                    "belt": tc_belt.get(),
+                    "hire_date": hire_date_entry.get_date().isoformat() if hire_date_entry.get_date() else None,
+                })
+            else:
+                execute("""
+                    INSERT INTO public.t_coaches (name,sex,email,phone,belt,hire_date)
+                    VALUES (%s,%s,%s,%s,%s,%s)
+                """, (
+                    tc_name.get(),
+                    tc_sex.get(),
+                    tc_email.get().strip(),
+                    tc_phone.get(),
+                    tc_belt.get(),
+                    hire_date_entry.get_date()
+                ))
 
             load_teachers()
 
         except Exception as e:
-            if isinstance(e, ValidationError):
+            if isinstance(e, ApiError):
+                messagebox.showerror("API error", str(e))
+            elif isinstance(e, ValidationError):
                 log_validation_error(e, "register_teacher")
                 messagebox.showerror("Validation error", str(e))
             else:
@@ -236,23 +276,38 @@ def build(tab_teachers):
             if hire_date_entry is None:
                 raise ValueError("Hire date widget missing")
 
-            execute("""
-                UPDATE public.t_coaches
-                SET name=%s,sex=%s,email=%s,phone=%s,belt=%s,hire_date=%s,updated_at=now()
-                WHERE id=%s
-            """, (
-                tc_name.get(),
-                tc_sex.get(),
-                tc_email.get().strip(),
-                tc_phone.get(),
-                tc_belt.get(),
-                hire_date_entry.get_date(),
-                selected_teacher_id
-            ))
+            if is_api_configured():
+                api_update_teacher(
+                    selected_teacher_id,
+                    {
+                        "name": tc_name.get(),
+                        "sex": tc_sex.get(),
+                        "email": tc_email.get().strip(),
+                        "phone": tc_phone.get(),
+                        "belt": tc_belt.get(),
+                        "hire_date": hire_date_entry.get_date().isoformat() if hire_date_entry.get_date() else None,
+                    },
+                )
+            else:
+                execute("""
+                    UPDATE public.t_coaches
+                    SET name=%s,sex=%s,email=%s,phone=%s,belt=%s,hire_date=%s,updated_at=now()
+                    WHERE id=%s
+                """, (
+                    tc_name.get(),
+                    tc_sex.get(),
+                    tc_email.get().strip(),
+                    tc_phone.get(),
+                    tc_belt.get(),
+                    hire_date_entry.get_date(),
+                    selected_teacher_id
+                ))
             load_teachers()
 
         except Exception as e:
-            if isinstance(e, ValidationError):
+            if isinstance(e, ApiError):
+                messagebox.showerror("API error", str(e))
+            elif isinstance(e, ValidationError):
                 log_validation_error(e, "update_teacher")
                 messagebox.showerror("Validation error", str(e))
             else:
@@ -262,18 +317,32 @@ def build(tab_teachers):
     def deactivate_teacher():
         if not selected_teacher_id:
             return
-        execute("""
-            UPDATE public.t_coaches SET active=false WHERE id=%s
-        """, (selected_teacher_id,))
+        if is_api_configured():
+            try:
+                api_deactivate_teacher(selected_teacher_id)
+            except ApiError as e:
+                messagebox.showerror("API error", str(e))
+                return
+        else:
+            execute("""
+                UPDATE public.t_coaches SET active=false WHERE id=%s
+            """, (selected_teacher_id,))
         load_teachers()
 
     # Mark the selected teacher active.
     def reactivate_teacher():
         if not selected_teacher_id:
             return
-        execute("""
-            UPDATE public.t_coaches SET active=true WHERE id=%s
-        """, (selected_teacher_id,))
+        if is_api_configured():
+            try:
+                api_reactivate_teacher(selected_teacher_id)
+            except ApiError as e:
+                messagebox.showerror("API error", str(e))
+                return
+        else:
+            execute("""
+                UPDATE public.t_coaches SET active=true WHERE id=%s
+            """, (selected_teacher_id,))
         load_teachers()
 
     # ---------- Bind buttons ----------
