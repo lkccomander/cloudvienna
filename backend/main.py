@@ -78,21 +78,6 @@ def health_check():
     return {"status": "ok"}
 
 
-@app.get("/debug/db-info")
-def debug_db_info(_: str = Depends(_require_auth)):
-    row = fetch_all(
-        """
-        SELECT
-            current_database() AS db_name,
-            current_user AS db_user,
-            inet_server_addr()::text AS server_addr,
-            inet_server_port() AS server_port,
-            (SELECT COUNT(*) FROM t_students) AS students_count
-        """
-    )[0]
-    return row
-
-
 @app.post("/auth/login", response_model=TokenResponse)
 def login(payload: LoginRequest):
     if payload.username != API_ADMIN_USER or payload.password != API_ADMIN_PASSWORD:
