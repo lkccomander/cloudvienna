@@ -25,7 +25,9 @@ _translations = {}
 
 def _load_json(path):
     try:
-        with open(path, "r", encoding="utf-8") as handle:
+        # Use utf-8-sig so JSON files saved with UTF-8 BOM (common on Windows)
+        # are parsed correctly instead of silently falling back to defaults.
+        with open(path, "r", encoding="utf-8-sig") as handle:
             return json.load(handle)
     except FileNotFoundError:
         return {}

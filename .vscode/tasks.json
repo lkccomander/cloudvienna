@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Check i18n Encoding (mojibake)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "if rg -n \"Ã|Â|�\" i18n/*.json; then echo \"\\nEncoding issue detected in i18n JSON files.\"; exit 1; else echo \"i18n encoding check passed.\"; fi"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

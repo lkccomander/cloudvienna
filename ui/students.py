@@ -1,6 +1,6 @@
 ﻿import tkinter as tk
 from tkinter import ttk, messagebox
-from datetime import date
+from datetime import date, datetime
 
 import matplotlib
 from matplotlib.figure import Figure
@@ -317,6 +317,22 @@ def build(tab_students):
         variable=st_newsletter
     ).grid(row=len(guardian_fields) + 1, column=2, columnspan=2, sticky="w", padx=(12, 0), pady=(4, 0))
 
+    age_value_var = tk.StringVar(value=t("label.student_age_unknown"))
+    academy_age_value_var = tk.StringVar(value=t("label.student_age_unknown"))
+    member_since = {"date": None}
+    ttk.Label(form, text=t("label.student_age")).grid(
+        row=len(guardian_fields) + 2, column=2, sticky="w", padx=(12, 0), pady=(4, 0)
+    )
+    ttk.Label(form, textvariable=age_value_var).grid(
+        row=len(guardian_fields) + 2, column=3, sticky="w", pady=(4, 0)
+    )
+    ttk.Label(form, text=t("label.student_academy_age")).grid(
+        row=len(guardian_fields) + 3, column=2, sticky="w", padx=(12, 0), pady=(2, 0)
+    )
+    ttk.Label(form, textvariable=academy_age_value_var).grid(
+        row=len(guardian_fields) + 3, column=3, sticky="w", pady=(2, 0)
+    )
+
     # Refresh the location combobox on click to pick up new locations.
     def on_location_click(event):
         options = refresh_location_options()
@@ -324,6 +340,38 @@ def build(tab_students):
             location_cb["values"] = options
     if location_cb is not None:
         location_cb.bind("<Button-1>", on_location_click)
+
+    def _format_duration(delta_days):
+        return t(
+            "label.student_age_value",
+            days=delta_days,
+            weeks=delta_days // 7,
+            months=delta_days // 30,
+            years=delta_days // 365,
+        )
+
+    def _update_student_age_label():
+        try:
+            birthday = st_birthday.get_date()
+        except Exception:
+            age_value_var.set(t("label.student_age_unknown"))
+            return
+
+        today = date.today()
+        delta_days = max((today - birthday).days, 0)
+        age_value_var.set(_format_duration(delta_days))
+
+    def _update_student_academy_age_label():
+        joined_date = member_since["date"]
+        if not joined_date:
+            academy_age_value_var.set(t("label.student_age_unknown"))
+            return
+        delta_days = max((date.today() - joined_date).days, 0)
+        academy_age_value_var.set(_format_duration(delta_days))
+
+    st_birthday.bind("<<DateEntrySelected>>", lambda event: _update_student_age_label())
+    _update_student_age_label()
+    _update_student_academy_age_label()
 
     def _set_guardian_fields_state():
         state = "normal" if st_is_minor.get() else "disabled"
@@ -564,6 +612,7 @@ def build(tab_students):
         nonlocal selected_student_id, selected_student_active
         selected_student_id = None
         selected_student_active = None
+        member_since["date"] = None
 
         st_name.set("")
         st_sex.set("")
@@ -585,6 +634,8 @@ def build(tab_students):
         st_guardian_phone2.set("")
         st_guardian_relationship.set("")
         st_birthday.set_date(date.today())
+        _update_student_age_label()
+        _update_student_academy_age_label()
 
         update_button_states()
 
@@ -677,7 +728,7 @@ def build(tab_students):
             SELECT s.name, s.sex, s.direction, s.postalcode, s.belt, s.email, s.phone, s.phone2,
                    s.weight, s.country, s.taxid, l.name AS location, s.birthday, s.newsletter_opt_in,
                    s.is_minor, s.guardian_name, s.guardian_email, s.guardian_phone, s.guardian_phone2,
-                   s.guardian_relationship
+                   s.guardian_relationship, s.created_at
             FROM t_students s
             LEFT JOIN t_locations l ON s.location_id = l.id
             WHERE s.id = %s
@@ -705,6 +756,7 @@ def build(tab_students):
         st_location.set(location_label)
         if row[12]:
             st_birthday.set_date(row[12])
+        _update_student_age_label()
         st_newsletter.set(row[13] if row[13] is not None else True)
         st_is_minor.set(bool(row[14]))
         st_guardian_name.set(row[15] or "")
@@ -712,6 +764,11 @@ def build(tab_students):
         st_guardian_phone.set(row[17] or "")
         st_guardian_phone2.set(row[18] or "")
         st_guardian_relationship.set(row[19] or "")
+        if row[20]:
+            member_since["date"] = row[20].date() if isinstance(row[20], datetime) else row[20]
+        else:
+            member_since["date"] = None
+        _update_student_academy_age_label()
 
         update_button_states()
 
