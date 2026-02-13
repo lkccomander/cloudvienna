@@ -1,6 +1,15 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+from api_client import (
+    ApiError,
+    create_location as api_create_location,
+    deactivate_location as api_deactivate_location,
+    is_api_configured,
+    list_locations as api_list_locations,
+    reactivate_location as api_reactivate_location,
+    update_location as api_update_location,
+)
 from db import execute
 from i18n import t
 from validation_middleware import ValidationError, validate_required
@@ -122,11 +131,21 @@ def build(tab_locations):
     # Load locations into the grid.
     def load_locations():
         locations_tree.delete(*locations_tree.get_children())
-        rows = execute("""
-            SELECT id, name, phone, address, active
-            FROM t_locations
-            ORDER BY name
-        """)
+        if is_api_configured():
+            try:
+                rows = [
+                    (r.get("id"), r.get("name"), r.get("phone"), r.get("address"), r.get("active"))
+                    for r in api_list_locations()
+                ]
+            except ApiError as e:
+                messagebox.showerror("API error", str(e))
+                rows = []
+        else:
+            rows = execute("""
+                SELECT id, name, phone, address, active
+                FROM t_locations
+                ORDER BY name
+            """)
         if not rows:
             locations_tree.insert(
                 "", tk.END,
@@ -186,19 +205,28 @@ def build(tab_locations):
     def register_location():
         try:
             validate_required(loc_name.get(), "Location name")
-            execute("""
-                INSERT INTO t_locations (name, phone, address)
-                VALUES (%s, %s, %s)
-            """, (
-                loc_name.get().strip(),
-                loc_phone.get().strip() or None,
-                loc_address.get().strip() or None
-            ))
+            if is_api_configured():
+                api_create_location({
+                    "name": loc_name.get().strip(),
+                    "phone": loc_phone.get().strip() or None,
+                    "address": loc_address.get().strip() or None,
+                })
+            else:
+                execute("""
+                    INSERT INTO t_locations (name, phone, address)
+                    VALUES (%s, %s, %s)
+                """, (
+                    loc_name.get().strip(),
+                    loc_phone.get().strip() or None,
+                    loc_address.get().strip() or None
+                ))
             load_locations()
             clear_location_form()
         except ValidationError as ve:
             log_validation_error(ve, "register_location")
             messagebox.showerror("Validation error", str(ve))
+        except ApiError as ae:
+            messagebox.showerror("API error", str(ae))
         except Exception as e:
             handle_db_error(e, "register_location")
 
@@ -210,21 +238,33 @@ def build(tab_locations):
             return
         try:
             validate_required(loc_name.get(), "Location name")
-            execute("""
-                UPDATE t_locations
-                SET name=%s, phone=%s, address=%s, updated_at=now()
-                WHERE id=%s
-            """, (
-                loc_name.get().strip(),
-                loc_phone.get().strip() or None,
-                loc_address.get().strip() or None,
-                selected_location_id
-            ))
+            if is_api_configured():
+                api_update_location(
+                    selected_location_id,
+                    {
+                        "name": loc_name.get().strip(),
+                        "phone": loc_phone.get().strip() or None,
+                        "address": loc_address.get().strip() or None,
+                    },
+                )
+            else:
+                execute("""
+                    UPDATE t_locations
+                    SET name=%s, phone=%s, address=%s, updated_at=now()
+                    WHERE id=%s
+                """, (
+                    loc_name.get().strip(),
+                    loc_phone.get().strip() or None,
+                    loc_address.get().strip() or None,
+                    selected_location_id
+                ))
             load_locations()
             clear_location_form()
         except ValidationError as ve:
             log_validation_error(ve, "update_location")
             messagebox.showerror("Validation error", str(ve))
+        except ApiError as ae:
+            messagebox.showerror("API error", str(ae))
         except Exception as e:
             handle_db_error(e, "update_location")
 
@@ -234,9 +274,16 @@ def build(tab_locations):
             return
         if not messagebox.askyesno("Confirm", "Deactivate this location?"):
             return
-        execute("""
-            UPDATE t_locations SET active=false WHERE id=%s
-        """, (selected_location_id,))
+        if is_api_configured():
+            try:
+                api_deactivate_location(selected_location_id)
+            except ApiError as ae:
+                messagebox.showerror("API error", str(ae))
+                return
+        else:
+            execute("""
+                UPDATE t_locations SET active=false WHERE id=%s
+            """, (selected_location_id,))
         load_locations()
         clear_location_form()
 
@@ -246,9 +293,16 @@ def build(tab_locations):
             return
         if not messagebox.askyesno("Confirm", "Reactivate this location?"):
             return
-        execute("""
-            UPDATE t_locations SET active=true WHERE id=%s
-        """, (selected_location_id,))
+        if is_api_configured():
+            try:
+                api_reactivate_location(selected_location_id)
+            except ApiError as ae:
+                messagebox.showerror("API error", str(ae))
+                return
+        else:
+            execute("""
+                UPDATE t_locations SET active=true WHERE id=%s
+            """, (selected_location_id,))
         load_locations()
         clear_location_form()
 
