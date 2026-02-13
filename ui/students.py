@@ -8,6 +8,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from tkcalendar import DateEntry
 
 from api_client import (
+    active_locations as api_active_locations,
     ApiError,
     deactivate_student as api_deactivate_student,
     count_students as api_count_students,
@@ -95,6 +96,13 @@ def build(tab_students):
     # =====================================================
     # Return counts of students grouped by active status.
     def count_students_by_status():
+        if is_api_configured():
+            try:
+                active_total = int(api_count_students(status_filter="Active").get("total", 0))
+                inactive_total = int(api_count_students(status_filter="Inactive").get("total", 0))
+                return {True: active_total, False: inactive_total}
+            except ApiError:
+                return {True: 0, False: 0}
         rows = execute("""
             SELECT active, COUNT(id)
             FROM t_students
@@ -250,12 +258,18 @@ def build(tab_students):
     # Populate the location combobox with active locations.
     def refresh_location_options():
         nonlocal location_option_map
-        rows = execute("""
-            SELECT id, name
-            FROM t_locations
-            WHERE active = true
-            ORDER BY name
-        """)
+        if is_api_configured():
+            try:
+                rows = [(r.get("id"), r.get("name")) for r in api_active_locations()]
+            except ApiError:
+                rows = []
+        else:
+            rows = execute("""
+                SELECT id, name
+                FROM t_locations
+                WHERE active = true
+                ORDER BY name
+            """)
         options = []
         option_map = {}
         for loc_id, name in rows:

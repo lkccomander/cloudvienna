@@ -146,3 +146,7 @@ def deactivate_student(student_id):
 
 def reactivate_student(student_id):
     return _with_auth_request("POST", f"/students/{int(student_id)}/reactivate")
+
+
+def active_locations():
+    return _with_auth_request("GET", "/locations/active")

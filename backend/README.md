@@ -13,6 +13,7 @@ This is the first backend scaffold to remove direct DB access from the GUI clien
 - `PUT /students/{id}`
 - `POST /students/{id}/deactivate`
 - `POST /students/{id}/reactivate`
+- `GET /locations/active`
 
 ## Environment variables
 

@@ -76,6 +76,11 @@ class CountResponse(BaseModel):
     total: int
 
 
+class LocationOut(BaseModel):
+    id: int
+    name: str
+
+
 class StudentDetailOut(BaseModel):
     id: int
     name: Optional[str] = None

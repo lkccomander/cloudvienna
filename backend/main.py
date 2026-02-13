@@ -10,6 +10,7 @@ from backend.db import execute, execute_returning_one, fetch_all
 from backend.schemas import (
     CountResponse,
     LoginRequest,
+    LocationOut,
     StudentCreateRequest,
     StudentCreateResponse,
     StudentDetailOut,
@@ -139,6 +140,19 @@ def students_count(
         """
     )[0]
     return CountResponse(total=int(row["total"]))
+
+
+@app.get("/locations/active", response_model=list[LocationOut])
+def active_locations(_: str = Depends(_require_auth)):
+    rows = fetch_all(
+        """
+        SELECT id, name
+        FROM t_locations
+        WHERE active = true
+        ORDER BY name
+        """
+    )
+    return [LocationOut.model_validate(row) for row in rows]
 
 
 @app.post("/students/create", response_model=StudentCreateResponse, status_code=201)
