@@ -79,6 +79,24 @@ class CountResponse(BaseModel):
 class LocationOut(BaseModel):
     id: int
     name: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    active: Optional[bool] = True
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LocationIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    phone: Optional[str] = None
+    address: Optional[str] = None
+
+
+class LocationCreateResponse(BaseModel):
+    id: int
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TeacherIn(BaseModel):
@@ -106,6 +124,54 @@ class TeacherOut(BaseModel):
 class TeacherCreateResponse(BaseModel):
     id: int
     created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class IdNameOut(BaseModel):
+    id: int
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ClassIn(BaseModel):
+    name: str = Field(min_length=1, max_length=150)
+    belt_level: Optional[str] = None
+    coach_id: int
+    duration_min: int = Field(ge=1)
+
+
+class ClassOut(BaseModel):
+    id: int
+    name: Optional[str] = None
+    belt_level: Optional[str] = None
+    coach_id: Optional[int] = None
+    coach_name: Optional[str] = None
+    duration_min: Optional[int] = None
+    active: Optional[bool] = True
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SessionIn(BaseModel):
+    class_id: int
+    session_date: date
+    start_time: str
+    end_time: str
+    location_id: int
+
+
+class SessionOut(BaseModel):
+    id: int
+    class_id: Optional[int] = None
+    class_name: Optional[str] = None
+    session_date: Optional[date] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    location_id: Optional[int] = None
+    location_name: Optional[str] = None
+    cancelled: Optional[bool] = False
 
     model_config = ConfigDict(from_attributes=True)
 

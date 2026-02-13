@@ -4,6 +4,23 @@ from datetime import date
 
 from tkcalendar import DateEntry
 
+from api_client import (
+    ApiError,
+    active_classes as api_active_classes,
+    active_locations as api_active_locations,
+    active_teachers as api_active_teachers,
+    cancel_session as api_cancel_session,
+    create_class as api_create_class,
+    create_session as api_create_session,
+    deactivate_class as api_deactivate_class,
+    is_api_configured,
+    list_classes as api_list_classes,
+    list_sessions as api_list_sessions,
+    reactivate_class as api_reactivate_class,
+    restore_session as api_restore_session,
+    update_class as api_update_class,
+    update_session as api_update_session,
+)
 from db import execute
 from i18n import t
 from validation_middleware import ValidationError, validate_required
@@ -33,7 +50,8 @@ def build(tab_sessions):
    # ttk.Label(tab_sessions, text="SESSIONS TAB OK", foreground="green").grid(
     #    row=0, column=0, columnspan=3, sticky="w", padx=10, pady=10
     #)
-    _ensure_session_location_schema()
+    if not is_api_configured():
+        _ensure_session_location_schema()
     sessions_form_frame = ttk.LabelFrame(tab_sessions, text=t("label.sessions"), padding=10)
     sessions_form_frame.grid(row=1, column=1, sticky="ne", padx=10, pady=5)
 
@@ -211,12 +229,19 @@ def build(tab_sessions):
     # Populate the coach combobox with active coaches from the database.
     def refresh_coach_options(show_empty_message=False):
         nonlocal coach_option_map
-        rows = execute("""
-            SELECT id, name
-            FROM public.t_coaches
-            WHERE active = true
-            ORDER BY name
-        """)
+        if is_api_configured():
+            try:
+                rows = [(r.get("id"), r.get("name")) for r in api_active_teachers()]
+            except ApiError as e:
+                messagebox.showerror("API error", str(e))
+                rows = []
+        else:
+            rows = execute("""
+                SELECT id, name
+                FROM public.t_coaches
+                WHERE active = true
+                ORDER BY name
+            """)
         options = []
         option_map = {}
         for coach_id, name in rows:
@@ -231,12 +256,19 @@ def build(tab_sessions):
     # Populate the class combobox with active classes from the database.
     def refresh_class_options():
         nonlocal class_option_map
-        rows = execute("""
-            SELECT id, name
-            FROM t_classes
-            WHERE active = true
-            ORDER BY name
-        """)
+        if is_api_configured():
+            try:
+                rows = [(r.get("id"), r.get("name")) for r in api_active_classes()]
+            except ApiError as e:
+                messagebox.showerror("API error", str(e))
+                rows = []
+        else:
+            rows = execute("""
+                SELECT id, name
+                FROM t_classes
+                WHERE active = true
+                ORDER BY name
+            """)
         options = []
         option_map = {}
         for class_id, name in rows:
@@ -249,12 +281,19 @@ def build(tab_sessions):
     # Populate the location combobox with active locations from the database.
     def refresh_location_options(show_empty_message=False):
         nonlocal location_option_map
-        rows = execute("""
-            SELECT id, name
-            FROM t_locations
-            WHERE active = true
-            ORDER BY name
-        """)
+        if is_api_configured():
+            try:
+                rows = [(r.get("id"), r.get("name")) for r in api_active_locations()]
+            except ApiError as e:
+                messagebox.showerror("API error", str(e))
+                rows = []
+        else:
+            rows = execute("""
+                SELECT id, name
+                FROM t_locations
+                WHERE active = true
+                ORDER BY name
+            """)
         options = []
         option_map = {}
         for loc_id, name in rows:
@@ -294,12 +333,29 @@ def build(tab_sessions):
     # Load classes from the database into the classes tree and refresh options.
     def load_classes():
         classes_tree.delete(*classes_tree.get_children())
-        rows = execute("""
-            SELECT c.id, c.name, c.belt_level, c.duration_min, c.active, t.name
-            FROM t_classes c
-            JOIN public.t_coaches t ON c.coach_id = t.id
-            ORDER BY c.name
-        """)
+        if is_api_configured():
+            try:
+                rows = [
+                    (
+                        r.get("id"),
+                        r.get("name"),
+                        r.get("belt_level"),
+                        r.get("duration_min"),
+                        r.get("active"),
+                        r.get("coach_name"),
+                    )
+                    for r in api_list_classes()
+                ]
+            except ApiError as e:
+                messagebox.showerror("API error", str(e))
+                rows = []
+        else:
+            rows = execute("""
+                SELECT c.id, c.name, c.belt_level, c.duration_min, c.active, t.name
+                FROM t_classes c
+                JOIN public.t_coaches t ON c.coach_id = t.id
+                ORDER BY c.name
+            """)
         if not rows:
             classes_tree.insert(
                 "", tk.END,
@@ -321,13 +377,31 @@ def build(tab_sessions):
     # Load class sessions from the database into the sessions tree.
     def load_sessions():
         sessions_tree.delete(*sessions_tree.get_children())
-        rows = execute("""
-            SELECT cs.id, c.name, cs.session_date, cs.start_time, cs.end_time, l.name, cs.cancelled
-            FROM t_class_sessions cs
-            JOIN t_classes c ON cs.class_id = c.id
-            LEFT JOIN t_locations l ON cs.location_id = l.id
-            ORDER BY cs.session_date DESC, cs.start_time DESC
-        """)
+        if is_api_configured():
+            try:
+                rows = [
+                    (
+                        r.get("id"),
+                        r.get("class_name"),
+                        r.get("session_date"),
+                        r.get("start_time"),
+                        r.get("end_time"),
+                        r.get("location_name"),
+                        r.get("cancelled"),
+                    )
+                    for r in api_list_sessions()
+                ]
+            except ApiError as e:
+                messagebox.showerror("API error", str(e))
+                rows = []
+        else:
+            rows = execute("""
+                SELECT cs.id, c.name, cs.session_date, cs.start_time, cs.end_time, l.name, cs.cancelled
+                FROM t_class_sessions cs
+                JOIN t_classes c ON cs.class_id = c.id
+                LEFT JOIN t_locations l ON cs.location_id = l.id
+                ORDER BY cs.session_date DESC, cs.start_time DESC
+            """)
         if not rows:
             sessions_tree.insert(
                 "", tk.END,
@@ -374,15 +448,25 @@ def build(tab_sessions):
             if not coach_id:
                 raise ValidationError("Select a valid coach")
 
-            execute("""
-                INSERT INTO t_classes (name, belt_level, coach_id, duration_min)
-                VALUES (%s, %s, %s, %s)
-            """, (
-                class_name.get(),
-                class_belt.get(),
-                coach_id,
-                duration
-            ))
+            if is_api_configured():
+                api_create_class(
+                    {
+                        "name": class_name.get(),
+                        "belt_level": class_belt.get(),
+                        "coach_id": coach_id,
+                        "duration_min": duration,
+                    }
+                )
+            else:
+                execute("""
+                    INSERT INTO t_classes (name, belt_level, coach_id, duration_min)
+                    VALUES (%s, %s, %s, %s)
+                """, (
+                    class_name.get(),
+                    class_belt.get(),
+                    coach_id,
+                    duration
+                ))
 
             load_classes()
             messagebox.showinfo("OK", "Class created")
@@ -390,6 +474,8 @@ def build(tab_sessions):
         except ValidationError as ve:
             log_validation_error(ve, "register_class")
             messagebox.showerror("Validation error", str(ve))
+        except ApiError as ae:
+            messagebox.showerror("API error", str(ae))
         except Exception as e:
             handle_db_error(e, "register_class")
 
@@ -415,17 +501,28 @@ def build(tab_sessions):
             if not coach_id:
                 raise ValidationError("Select a valid coach")
 
-            execute("""
-                UPDATE t_classes
-                SET name=%s, belt_level=%s, coach_id=%s, duration_min=%s
-                WHERE id=%s
-            """, (
-                class_name.get(),
-                class_belt.get(),
-                coach_id,
-                duration,
-                selected_class_id
-            ))
+            if is_api_configured():
+                api_update_class(
+                    selected_class_id,
+                    {
+                        "name": class_name.get(),
+                        "belt_level": class_belt.get(),
+                        "coach_id": coach_id,
+                        "duration_min": duration,
+                    },
+                )
+            else:
+                execute("""
+                    UPDATE t_classes
+                    SET name=%s, belt_level=%s, coach_id=%s, duration_min=%s
+                    WHERE id=%s
+                """, (
+                    class_name.get(),
+                    class_belt.get(),
+                    coach_id,
+                    duration,
+                    selected_class_id
+                ))
 
             load_classes()
             messagebox.showinfo("OK", "Class updated")
@@ -433,6 +530,8 @@ def build(tab_sessions):
         except ValidationError as ve:
             log_validation_error(ve, "update_class")
             messagebox.showerror("Validation error", str(ve))
+        except ApiError as ae:
+            messagebox.showerror("API error", str(ae))
         except Exception as e:
             handle_db_error(e, "update_class")
 
@@ -442,9 +541,16 @@ def build(tab_sessions):
             return
         if not messagebox.askyesno("Confirm", "Deactivate this class?"):
             return
-        execute("""
-            UPDATE t_classes SET active=false WHERE id=%s
-        """, (selected_class_id,))
+        if is_api_configured():
+            try:
+                api_deactivate_class(selected_class_id)
+            except ApiError as ae:
+                messagebox.showerror("API error", str(ae))
+                return
+        else:
+            execute("""
+                UPDATE t_classes SET active=false WHERE id=%s
+            """, (selected_class_id,))
         load_classes()
 
     # Mark the selected class active after confirmation.
@@ -453,9 +559,16 @@ def build(tab_sessions):
             return
         if not messagebox.askyesno("Confirm", "Reactivate this class?"):
             return
-        execute("""
-            UPDATE t_classes SET active=true WHERE id=%s
-        """, (selected_class_id,))
+        if is_api_configured():
+            try:
+                api_reactivate_class(selected_class_id)
+            except ApiError as ae:
+                messagebox.showerror("API error", str(ae))
+                return
+        else:
+            execute("""
+                UPDATE t_classes SET active=true WHERE id=%s
+            """, (selected_class_id,))
         load_classes()
 
     # Populate class form fields when a class row is selected.
@@ -510,16 +623,27 @@ def build(tab_sessions):
             if not location_id:
                 raise ValidationError("Select a valid location")
 
-            execute("""
-                INSERT INTO t_class_sessions (class_id, session_date, start_time, end_time, location_id)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (
-                class_id,
-                session_date.get_date(),
-                session_start.get().strip(),
-                session_end.get().strip(),
-                location_id
-            ))
+            if is_api_configured():
+                api_create_session(
+                    {
+                        "class_id": class_id,
+                        "session_date": session_date.get_date().isoformat(),
+                        "start_time": session_start.get().strip(),
+                        "end_time": session_end.get().strip(),
+                        "location_id": location_id,
+                    }
+                )
+            else:
+                execute("""
+                    INSERT INTO t_class_sessions (class_id, session_date, start_time, end_time, location_id)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (
+                    class_id,
+                    session_date.get_date(),
+                    session_start.get().strip(),
+                    session_end.get().strip(),
+                    location_id
+                ))
 
             load_sessions()
             messagebox.showinfo("OK", "Session created")
@@ -527,6 +651,8 @@ def build(tab_sessions):
         except ValidationError as ve:
             log_validation_error(ve, "register_session")
             messagebox.showerror("Validation error", str(ve))
+        except ApiError as ae:
+            messagebox.showerror("API error", str(ae))
         except Exception as e:
             handle_db_error(e, "register_session")
 
@@ -550,18 +676,30 @@ def build(tab_sessions):
             if not location_id:
                 raise ValidationError("Select a valid location")
 
-            execute("""
-                UPDATE t_class_sessions
-                SET class_id=%s, session_date=%s, start_time=%s, end_time=%s, location_id=%s
-                WHERE id=%s
-            """, (
-                class_id,
-                session_date.get_date(),
-                session_start.get().strip(),
-                session_end.get().strip(),
-                location_id,
-                selected_session_id
-            ))
+            if is_api_configured():
+                api_update_session(
+                    selected_session_id,
+                    {
+                        "class_id": class_id,
+                        "session_date": session_date.get_date().isoformat(),
+                        "start_time": session_start.get().strip(),
+                        "end_time": session_end.get().strip(),
+                        "location_id": location_id,
+                    },
+                )
+            else:
+                execute("""
+                    UPDATE t_class_sessions
+                    SET class_id=%s, session_date=%s, start_time=%s, end_time=%s, location_id=%s
+                    WHERE id=%s
+                """, (
+                    class_id,
+                    session_date.get_date(),
+                    session_start.get().strip(),
+                    session_end.get().strip(),
+                    location_id,
+                    selected_session_id
+                ))
 
             load_sessions()
             messagebox.showinfo("OK", "Session updated")
@@ -569,6 +707,8 @@ def build(tab_sessions):
         except ValidationError as ve:
             log_validation_error(ve, "update_session")
             messagebox.showerror("Validation error", str(ve))
+        except ApiError as ae:
+            messagebox.showerror("API error", str(ae))
         except Exception as e:
             handle_db_error(e, "update_session")
 
@@ -578,9 +718,16 @@ def build(tab_sessions):
             return
         if not messagebox.askyesno("Confirm", "Cancel this session?"):
             return
-        execute("""
-            UPDATE t_class_sessions SET cancelled=true WHERE id=%s
-        """, (selected_session_id,))
+        if is_api_configured():
+            try:
+                api_cancel_session(selected_session_id)
+            except ApiError as ae:
+                messagebox.showerror("API error", str(ae))
+                return
+        else:
+            execute("""
+                UPDATE t_class_sessions SET cancelled=true WHERE id=%s
+            """, (selected_session_id,))
         load_sessions()
 
     # Restore the selected cancelled session.
@@ -589,9 +736,16 @@ def build(tab_sessions):
             return
         if not messagebox.askyesno("Confirm", "Restore this session?"):
             return
-        execute("""
-            UPDATE t_class_sessions SET cancelled=false WHERE id=%s
-        """, (selected_session_id,))
+        if is_api_configured():
+            try:
+                api_restore_session(selected_session_id)
+            except ApiError as ae:
+                messagebox.showerror("API error", str(ae))
+                return
+        else:
+            execute("""
+                UPDATE t_class_sessions SET cancelled=false WHERE id=%s
+            """, (selected_session_id,))
         load_sessions()
 
     # Populate session form fields when a session row is selected.

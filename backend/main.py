@@ -8,9 +8,16 @@ from backend.config import (
 )
 from backend.db import execute, execute_returning_one, fetch_all
 from backend.schemas import (
+    ClassIn,
+    ClassOut,
     CountResponse,
+    IdNameOut,
     LoginRequest,
+    LocationCreateResponse,
+    LocationIn,
     LocationOut,
+    SessionIn,
+    SessionOut,
     TeacherCreateResponse,
     TeacherIn,
     TeacherOut,
@@ -31,6 +38,57 @@ auth_scheme = HTTPBearer(auto_error=True)
 @app.on_event("startup")
 def startup_migrations():
     # Keep API resilient with legacy databases used by the current desktop app.
+    execute(
+        """
+        CREATE TABLE IF NOT EXISTS t_locations (
+            id serial PRIMARY KEY,
+            name text NOT NULL UNIQUE,
+            phone text,
+            address text,
+            active boolean NOT NULL DEFAULT true,
+            created_at timestamp NOT NULL DEFAULT now(),
+            updated_at timestamp
+        )
+        """
+    )
+    execute(
+        """
+        ALTER TABLE t_class_sessions
+        ADD COLUMN IF NOT EXISTS location_id integer
+        """
+    )
+    execute(
+        """
+        DO $$
+        BEGIN
+            ALTER TABLE t_class_sessions
+            ADD CONSTRAINT fk_sessions_location
+            FOREIGN KEY (location_id)
+            REFERENCES t_locations(id);
+        EXCEPTION
+            WHEN duplicate_object THEN NULL;
+        END $$;
+        """
+    )
+    execute(
+        """
+        ALTER TABLE t_students
+        ADD COLUMN IF NOT EXISTS location_id integer
+        """
+    )
+    execute(
+        """
+        DO $$
+        BEGIN
+            ALTER TABLE t_students
+            ADD CONSTRAINT fk_students_location
+            FOREIGN KEY (location_id)
+            REFERENCES t_locations(id);
+        EXCEPTION
+            WHEN duplicate_object THEN NULL;
+        END $$;
+        """
+    )
     execute(
         """
         ALTER TABLE t_students
@@ -158,6 +216,86 @@ def active_locations(_: str = Depends(_require_auth)):
     return [LocationOut.model_validate(row) for row in rows]
 
 
+@app.get("/locations/list", response_model=list[LocationOut])
+def list_locations(_: str = Depends(_require_auth)):
+    rows = fetch_all(
+        """
+        SELECT id, name, phone, address, active
+        FROM t_locations
+        ORDER BY name
+        """
+    )
+    return [LocationOut.model_validate(row) for row in rows]
+
+
+@app.post("/locations/create", response_model=LocationCreateResponse, status_code=201)
+def create_location(payload: LocationIn, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        """
+        INSERT INTO t_locations (name, phone, address)
+        VALUES (%s, %s, %s)
+        RETURNING id, created_at
+        """,
+        (
+            payload.name.strip(),
+            payload.phone.strip() if payload.phone else None,
+            payload.address.strip() if payload.address else None,
+        ),
+    )
+    return LocationCreateResponse.model_validate(row)
+
+
+@app.put("/locations/{location_id}", response_model=LocationCreateResponse)
+def update_location(location_id: int, payload: LocationIn, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        """
+        UPDATE t_locations
+        SET name=%s, phone=%s, address=%s, updated_at=now()
+        WHERE id=%s
+        RETURNING id, created_at
+        """,
+        (
+            payload.name.strip(),
+            payload.phone.strip() if payload.phone else None,
+            payload.address.strip() if payload.address else None,
+            location_id,
+        ),
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
+    return LocationCreateResponse.model_validate(row)
+
+
+@app.post("/locations/{location_id}/deactivate")
+def deactivate_location(location_id: int, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        """
+        UPDATE t_locations SET active=false, updated_at=now()
+        WHERE id=%s
+        RETURNING id
+        """,
+        (location_id,),
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
+    return {"status": "ok", "id": row["id"], "active": False}
+
+
+@app.post("/locations/{location_id}/reactivate")
+def reactivate_location(location_id: int, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        """
+        UPDATE t_locations SET active=true, updated_at=now()
+        WHERE id=%s
+        RETURNING id
+        """,
+        (location_id,),
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
+    return {"status": "ok", "id": row["id"], "active": True}
+
+
 @app.get("/teachers/list", response_model=list[TeacherOut])
 def list_teachers(_: str = Depends(_require_auth)):
     rows = fetch_all(
@@ -168,6 +306,19 @@ def list_teachers(_: str = Depends(_require_auth)):
         """
     )
     return [TeacherOut.model_validate(row) for row in rows]
+
+
+@app.get("/teachers/active", response_model=list[IdNameOut])
+def active_teachers(_: str = Depends(_require_auth)):
+    rows = fetch_all(
+        """
+        SELECT id, name
+        FROM public.t_coaches
+        WHERE active = true
+        ORDER BY name
+        """
+    )
+    return [IdNameOut.model_validate(row) for row in rows]
 
 
 @app.post("/teachers/create", response_model=TeacherCreateResponse, status_code=201)
@@ -244,6 +395,162 @@ def reactivate_teacher(teacher_id: int, _: str = Depends(_require_auth)):
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
     return {"status": "ok", "id": row["id"], "active": True}
+
+
+@app.get("/classes/list", response_model=list[ClassOut])
+def list_classes(_: str = Depends(_require_auth)):
+    rows = fetch_all(
+        """
+        SELECT c.id, c.name, c.belt_level, c.coach_id, c.duration_min, c.active, t.name AS coach_name
+        FROM t_classes c
+        JOIN public.t_coaches t ON c.coach_id = t.id
+        ORDER BY c.name
+        """
+    )
+    return [ClassOut.model_validate(row) for row in rows]
+
+
+@app.get("/classes/active", response_model=list[IdNameOut])
+def active_classes(_: str = Depends(_require_auth)):
+    rows = fetch_all(
+        """
+        SELECT id, name
+        FROM t_classes
+        WHERE active = true
+        ORDER BY name
+        """
+    )
+    return [IdNameOut.model_validate(row) for row in rows]
+
+
+@app.post("/classes/create", response_model=IdNameOut, status_code=201)
+def create_class(payload: ClassIn, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        """
+        INSERT INTO t_classes (name, belt_level, coach_id, duration_min)
+        VALUES (%s, %s, %s, %s)
+        RETURNING id, name
+        """,
+        (payload.name.strip(), payload.belt_level, payload.coach_id, payload.duration_min),
+    )
+    return IdNameOut.model_validate(row)
+
+
+@app.put("/classes/{class_id}", response_model=IdNameOut)
+def update_class(class_id: int, payload: ClassIn, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        """
+        UPDATE t_classes
+        SET name=%s, belt_level=%s, coach_id=%s, duration_min=%s
+        WHERE id=%s
+        RETURNING id, name
+        """,
+        (payload.name.strip(), payload.belt_level, payload.coach_id, payload.duration_min, class_id),
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Class not found")
+    return IdNameOut.model_validate(row)
+
+
+@app.post("/classes/{class_id}/deactivate")
+def deactivate_class(class_id: int, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        "UPDATE t_classes SET active=false WHERE id=%s RETURNING id",
+        (class_id,),
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Class not found")
+    return {"status": "ok", "id": row["id"], "active": False}
+
+
+@app.post("/classes/{class_id}/reactivate")
+def reactivate_class(class_id: int, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        "UPDATE t_classes SET active=true WHERE id=%s RETURNING id",
+        (class_id,),
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Class not found")
+    return {"status": "ok", "id": row["id"], "active": True}
+
+
+@app.get("/sessions/list", response_model=list[SessionOut])
+def list_sessions(_: str = Depends(_require_auth)):
+    rows = fetch_all(
+        """
+        SELECT cs.id, cs.class_id, c.name AS class_name, cs.session_date, cs.start_time::text, cs.end_time::text,
+               cs.location_id, l.name AS location_name, cs.cancelled
+        FROM t_class_sessions cs
+        JOIN t_classes c ON cs.class_id = c.id
+        LEFT JOIN t_locations l ON cs.location_id = l.id
+        ORDER BY cs.session_date DESC, cs.start_time DESC
+        """
+    )
+    return [SessionOut.model_validate(row) for row in rows]
+
+
+@app.post("/sessions/create", response_model=IdNameOut, status_code=201)
+def create_session(payload: SessionIn, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        """
+        INSERT INTO t_class_sessions (class_id, session_date, start_time, end_time, location_id)
+        VALUES (%s, %s, %s, %s, %s)
+        RETURNING id, id::text AS name
+        """,
+        (
+            payload.class_id,
+            payload.session_date,
+            payload.start_time.strip(),
+            payload.end_time.strip(),
+            payload.location_id,
+        ),
+    )
+    return IdNameOut.model_validate(row)
+
+
+@app.put("/sessions/{session_id}", response_model=IdNameOut)
+def update_session(session_id: int, payload: SessionIn, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        """
+        UPDATE t_class_sessions
+        SET class_id=%s, session_date=%s, start_time=%s, end_time=%s, location_id=%s
+        WHERE id=%s
+        RETURNING id, id::text AS name
+        """,
+        (
+            payload.class_id,
+            payload.session_date,
+            payload.start_time.strip(),
+            payload.end_time.strip(),
+            payload.location_id,
+            session_id,
+        ),
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    return IdNameOut.model_validate(row)
+
+
+@app.post("/sessions/{session_id}/cancel")
+def cancel_session(session_id: int, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        "UPDATE t_class_sessions SET cancelled=true WHERE id=%s RETURNING id",
+        (session_id,),
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    return {"status": "ok", "id": row["id"], "cancelled": True}
+
+
+@app.post("/sessions/{session_id}/restore")
+def restore_session(session_id: int, _: str = Depends(_require_auth)):
+    row = execute_returning_one(
+        "UPDATE t_class_sessions SET cancelled=false WHERE id=%s RETURNING id",
+        (session_id,),
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    return {"status": "ok", "id": row["id"], "cancelled": False}
 
 
 @app.post("/students/create", response_model=StudentCreateResponse, status_code=201)

@@ -170,3 +170,71 @@ def deactivate_teacher(teacher_id):
 
 def reactivate_teacher(teacher_id):
     return _with_auth_request("POST", f"/teachers/{int(teacher_id)}/reactivate")
+
+
+def list_locations():
+    return _with_auth_request("GET", "/locations/list")
+
+
+def create_location(payload):
+    return _with_auth_request("POST", "/locations/create", payload=payload)
+
+
+def update_location(location_id, payload):
+    return _with_auth_request("PUT", f"/locations/{int(location_id)}", payload=payload)
+
+
+def deactivate_location(location_id):
+    return _with_auth_request("POST", f"/locations/{int(location_id)}/deactivate")
+
+
+def reactivate_location(location_id):
+    return _with_auth_request("POST", f"/locations/{int(location_id)}/reactivate")
+
+
+def active_teachers():
+    return _with_auth_request("GET", "/teachers/active")
+
+
+def list_classes():
+    return _with_auth_request("GET", "/classes/list")
+
+
+def active_classes():
+    return _with_auth_request("GET", "/classes/active")
+
+
+def create_class(payload):
+    return _with_auth_request("POST", "/classes/create", payload=payload)
+
+
+def update_class(class_id, payload):
+    return _with_auth_request("PUT", f"/classes/{int(class_id)}", payload=payload)
+
+
+def deactivate_class(class_id):
+    return _with_auth_request("POST", f"/classes/{int(class_id)}/deactivate")
+
+
+def reactivate_class(class_id):
+    return _with_auth_request("POST", f"/classes/{int(class_id)}/reactivate")
+
+
+def list_sessions():
+    return _with_auth_request("GET", "/sessions/list")
+
+
+def create_session(payload):
+    return _with_auth_request("POST", "/sessions/create", payload=payload)
+
+
+def update_session(session_id, payload):
+    return _with_auth_request("PUT", f"/sessions/{int(session_id)}", payload=payload)
+
+
+def cancel_session(session_id):
+    return _with_auth_request("POST", f"/sessions/{int(session_id)}/cancel")
+
+
+def restore_session(session_id):
+    return _with_auth_request("POST", f"/sessions/{int(session_id)}/restore")

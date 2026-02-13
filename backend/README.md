@@ -14,11 +14,28 @@ This is the first backend scaffold to remove direct DB access from the GUI clien
 - `POST /students/{id}/deactivate`
 - `POST /students/{id}/reactivate`
 - `GET /locations/active`
+- `GET /locations/list`
+- `POST /locations/create`
+- `PUT /locations/{id}`
+- `POST /locations/{id}/deactivate`
+- `POST /locations/{id}/reactivate`
 - `GET /teachers/list`
+- `GET /teachers/active`
 - `POST /teachers/create`
 - `PUT /teachers/{id}`
 - `POST /teachers/{id}/deactivate`
 - `POST /teachers/{id}/reactivate`
+- `GET /classes/list`
+- `GET /classes/active`
+- `POST /classes/create`
+- `PUT /classes/{id}`
+- `POST /classes/{id}/deactivate`
+- `POST /classes/{id}/reactivate`
+- `GET /sessions/list`
+- `POST /sessions/create`
+- `PUT /sessions/{id}`
+- `POST /sessions/{id}/cancel`
+- `POST /sessions/{id}/restore`
 
 ## Environment variables
 
