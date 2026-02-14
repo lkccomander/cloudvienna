@@ -16,3 +16,8 @@ Added de-AT translations and localized UI labels.
 Improved logging and error handling.
 CI/build improvements and icon/spec updates.
 README update (Star History) and .gitignore adjustments.
+
+## Security
+
+Production and cybersecurity hardening checklist:
+- `docs/PROD_SECURITY_CHECKLIST.md`

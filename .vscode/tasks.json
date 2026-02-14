@@ -2,6 +2,17 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Run Tests (Windows venv)",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": [
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "Check i18n Encoding (mojibake)",
       "type": "shell",
       "command": "bash",

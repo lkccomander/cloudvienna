@@ -41,6 +41,9 @@ DB_SSLMODE = os.getenv("DB_SSLMODE", str(_db.get("sslmode", "prefer")))
 
 API_HOST = os.getenv("API_HOST", "127.0.0.1")
 API_PORT = int(os.getenv("API_PORT", "8000"))
+API_TLS_CERTFILE = os.getenv("API_TLS_CERTFILE", "").strip()
+API_TLS_KEYFILE = os.getenv("API_TLS_KEYFILE", "").strip()
+API_PROXY_HEADERS = os.getenv("API_PROXY_HEADERS", "true").strip().lower() in {"1", "true", "yes", "on"}
 API_JWT_SECRET = os.getenv("API_JWT_SECRET", "CHANGE_ME_IN_ENV")
 API_JWT_ALGORITHM = "HS256"
 API_TOKEN_MINUTES = int(os.getenv("API_TOKEN_MINUTES", "60"))

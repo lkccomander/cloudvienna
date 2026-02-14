@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,6 +13,22 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in_minutes: int
+
+
+class ApiUserCreateIn(BaseModel):
+    username: str = Field(min_length=3, max_length=60)
+    password: str = Field(min_length=10, max_length=256)
+    role: Literal["admin", "operator", "viewer"] = "operator"
+
+
+class ApiUserOut(BaseModel):
+    id: int
+    username: str
+    role: str
+    active: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class StudentCreateRequest(BaseModel):

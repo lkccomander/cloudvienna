@@ -1,5 +1,6 @@
 import json
 import os
+import ssl
 import sys
 import time
 import urllib.error
@@ -33,10 +34,20 @@ def _api_config():
     base_url = os.getenv("API_BASE_URL") or cfg.get("base_url")
     username = os.getenv("API_USER") or cfg.get("username")
     password = os.getenv("API_PASSWORD") or cfg.get("password")
+    verify_tls = os.getenv("API_VERIFY_TLS")
+    if verify_tls is None:
+        verify_tls = cfg.get("verify_tls", True)
+    if isinstance(verify_tls, str):
+        verify_tls = verify_tls.strip().lower() in {"1", "true", "yes", "on"}
+    else:
+        verify_tls = bool(verify_tls)
+    ca_file = os.getenv("API_CA_FILE") or cfg.get("ca_file") or ""
     return {
         "base_url": (base_url or "").rstrip("/"),
         "username": username or "",
         "password": password or "",
+        "verify_tls": verify_tls,
+        "ca_file": str(ca_file).strip(),
     }
 
 
@@ -64,8 +75,14 @@ def _request(method, path, payload=None, token=None):
         headers["Authorization"] = f"Bearer {token}"
 
     req = urllib.request.Request(url=url, data=data, headers=headers, method=method)
+    ssl_context = None
+    if url.lower().startswith("https://"):
+        if cfg["ca_file"]:
+            ssl_context = ssl.create_default_context(cafile=cfg["ca_file"])
+        elif not cfg["verify_tls"]:
+            ssl_context = ssl._create_unverified_context()
     try:
-        with urllib.request.urlopen(req, timeout=12) as resp:
+        with urllib.request.urlopen(req, timeout=12, context=ssl_context) as resp:
             body = resp.read().decode("utf-8") if resp.length != 0 else ""
             return json.loads(body) if body else {}
     except urllib.error.HTTPError as exc:

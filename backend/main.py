@@ -6,8 +6,10 @@ from backend.config import (
     API_ADMIN_USER,
     API_TOKEN_MINUTES,
 )
-from backend.db import execute, execute_returning_one, fetch_all
+from backend.db import execute, execute_returning_one, fetch_all, fetch_one
 from backend.schemas import (
+    ApiUserCreateIn,
+    ApiUserOut,
     AttendanceRegisterIn,
     AttendanceRow,
     ClassIn,
@@ -33,7 +35,12 @@ from backend.schemas import (
     StudentUpdateRequest,
     TokenResponse,
 )
-from backend.security import create_access_token, verify_access_token
+from backend.security import (
+    create_access_token,
+    hash_password,
+    verify_access_token,
+    verify_password,
+)
 
 
 app = FastAPI(title="BJJ Vienna API", version="0.1.0")
@@ -116,6 +123,33 @@ def startup_migrations():
         ADD COLUMN IF NOT EXISTS guardian_relationship varchar(50)
         """
     )
+    execute(
+        """
+        CREATE TABLE IF NOT EXISTS t_api_users (
+            id serial PRIMARY KEY,
+            username varchar(60) NOT NULL UNIQUE,
+            password_hash text NOT NULL,
+            role varchar(20) NOT NULL DEFAULT 'operator',
+            active boolean NOT NULL DEFAULT true,
+            created_at timestamp NOT NULL DEFAULT now(),
+            updated_at timestamp
+        )
+        """
+    )
+    execute(
+        """
+        INSERT INTO t_api_users (username, password_hash, role, active)
+        SELECT %s, %s, 'admin', TRUE
+        WHERE NOT EXISTS (
+            SELECT 1 FROM t_api_users WHERE username = %s
+        )
+        """,
+        (
+            API_ADMIN_USER.strip(),
+            hash_password(API_ADMIN_PASSWORD),
+            API_ADMIN_USER.strip(),
+        ),
+    )
 
 
 def _normalize_sex(value: str) -> str:
@@ -138,6 +172,22 @@ def _require_auth(
     credentials: HTTPAuthorizationCredentials = Depends(auth_scheme),
 ) -> str:
     return verify_access_token(credentials.credentials)
+
+
+def _require_admin(subject: str = Depends(_require_auth)) -> str:
+    row = fetch_one(
+        """
+        SELECT role, active
+        FROM t_api_users
+        WHERE username = %s
+        """,
+        (subject,),
+    )
+    if not row or not row.get("active"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
+    if row.get("role") != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
+    return subject
 
 
 def _build_reports_student_filters(payload: ReportsStudentSearchIn):
@@ -248,16 +298,57 @@ def reports_students_export(payload: ReportsStudentSearchIn, _: str = Depends(_r
 
 @app.post("/auth/login", response_model=TokenResponse)
 def login(payload: LoginRequest):
-    if payload.username != API_ADMIN_USER or payload.password != API_ADMIN_PASSWORD:
+    username = payload.username.strip()
+    row = fetch_one(
+        """
+        SELECT username, password_hash, active
+        FROM t_api_users
+        WHERE username = %s
+        """,
+        (username,),
+    )
+    if not row or not row.get("active") or not verify_password(payload.password, row["password_hash"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
-    token = create_access_token(subject=payload.username)
+    token = create_access_token(subject=username)
     return TokenResponse(
         access_token=token,
         expires_in_minutes=API_TOKEN_MINUTES,
     )
+
+
+@app.get("/users/list", response_model=list[ApiUserOut])
+def list_users(_: str = Depends(_require_admin)):
+    rows = fetch_all(
+        """
+        SELECT id, username, role, active, created_at
+        FROM t_api_users
+        ORDER BY username
+        """
+    )
+    return [ApiUserOut.model_validate(row) for row in rows]
+
+
+@app.post("/users/create", response_model=ApiUserOut, status_code=201)
+def create_user(payload: ApiUserCreateIn, _: str = Depends(_require_admin)):
+    username = payload.username.strip()
+    existing = fetch_one(
+        "SELECT id FROM t_api_users WHERE username = %s",
+        (username,),
+    )
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
+    row = execute_returning_one(
+        """
+        INSERT INTO t_api_users (username, password_hash, role, active)
+        VALUES (%s, %s, %s, TRUE)
+        RETURNING id, username, role, active, created_at
+        """,
+        (username, hash_password(payload.password), payload.role),
+    )
+    return ApiUserOut.model_validate(row)
 
 
 @app.get("/students/list", response_model=list[StudentOut])

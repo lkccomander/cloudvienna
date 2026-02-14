@@ -6,6 +6,8 @@ This is the first backend scaffold to remove direct DB access from the GUI clien
 
 - `GET /health`
 - `POST /auth/login`
+- `GET /users/list` (admin)
+- `POST /users/create` (admin)
 - `GET /students/list`
 - `GET /students/count`
 - `GET /students/{id}`
@@ -56,11 +58,28 @@ Set these before running:
 - `API_ADMIN_PASSWORD` (default: `change-me`)
 - `API_JWT_SECRET` (required in production)
 - `API_TOKEN_MINUTES` (optional, default: `60`)
+- `API_HOST` (optional, default: `127.0.0.1`)
+- `API_PORT` (optional, default: `8000`)
+- `API_PROXY_HEADERS` (optional, default: `true`)
+- `API_TLS_CERTFILE` (optional, requires `API_TLS_KEYFILE`)
+- `API_TLS_KEYFILE` (optional, requires `API_TLS_CERTFILE`)
 
 ## Run
 
 ```bash
 uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Recommended (uses `backend/.env`):
+
+```bash
+python -m backend.run
+```
+
+To enable direct HTTPS on Uvicorn, set both `API_TLS_CERTFILE` and `API_TLS_KEYFILE`, then run:
+
+```bash
+python -m backend.run
 ```
 
 ## Quick test
@@ -82,9 +101,18 @@ Add this block to your `app_settings.json` so the Students tab can use the API:
 ```json
 {
   "api": {
-    "base_url": "http://127.0.0.1:8000",
+    "base_url": "https://127.0.0.1:8000",
     "username": "admin",
-    "password": "change-me"
+    "password": "change-me",
+    "verify_tls": true,
+    "ca_file": "C:/path/to/ca-or-selfsigned-cert.pem"
   }
 }
 ```
+
+Notes:
+- Keep `verify_tls: true` in production.
+- For local self-signed certificates, either trust the cert in OS trust store or set `ca_file`.
+- Use `verify_tls: false` only for temporary local development.
+- On first startup, the API bootstraps an admin user into `t_api_users` from
+  `API_ADMIN_USER` and `API_ADMIN_PASSWORD` if that username does not exist yet.
