@@ -357,12 +357,20 @@ def list_students(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     status_filter: str = Query(default="Active"),
+    name_query: str = Query(default=""),
 ):
-    where = ""
+    where_clauses = []
+    params: list[object] = []
     if status_filter == "Active":
-        where = "WHERE s.active = true"
+        where_clauses.append("s.active = true")
     elif status_filter == "Inactive":
-        where = "WHERE s.active = false"
+        where_clauses.append("s.active = false")
+    term = name_query.strip()
+    if term:
+        where_clauses.append("s.name ILIKE %s")
+        params.append(f"%{term}%")
+    where = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    params.extend([limit, offset])
 
     rows = fetch_all(
         f"""
@@ -375,7 +383,7 @@ def list_students(
         ORDER BY s.id
         LIMIT %s OFFSET %s
         """,
-        (limit, offset),
+        tuple(params),
     )
     return [StudentOut.model_validate(row) for row in rows]
 
@@ -384,18 +392,26 @@ def list_students(
 def students_count(
     _: str = Depends(_require_auth),
     status_filter: str = Query(default="Active"),
+    name_query: str = Query(default=""),
 ):
-    where = ""
+    where_clauses = []
+    params: list[object] = []
     if status_filter == "Active":
-        where = "WHERE s.active = true"
+        where_clauses.append("s.active = true")
     elif status_filter == "Inactive":
-        where = "WHERE s.active = false"
+        where_clauses.append("s.active = false")
+    term = name_query.strip()
+    if term:
+        where_clauses.append("s.name ILIKE %s")
+        params.append(f"%{term}%")
+    where = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
     row = fetch_all(
         f"""
         SELECT COUNT(s.id) AS total
         FROM t_students s
         {where}
-        """
+        """,
+        tuple(params),
     )[0]
     return CountResponse(total=int(row["total"]))
 

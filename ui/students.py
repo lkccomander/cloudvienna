@@ -90,6 +90,7 @@ def build(tab_students):
     selected_student_active = None
 
     filter_active = tk.StringVar(value="Active")
+    student_name_query = tk.StringVar(value="")
 
     # =====================================================
     # DB HELPERS FOR CHARTS
@@ -123,11 +124,13 @@ def build(tab_students):
     # Fetch a page of students based on the active filter.
     def load_students_paged(page):
         status_filter = filter_active.get()
+        name_query = student_name_query.get().strip()
         if is_api_configured():
             rows = api_list_students(
                 limit=PAGE_SIZE_STUDENTS,
                 offset=page * PAGE_SIZE_STUDENTS,
                 status_filter=status_filter,
+                name_query=name_query,
             )
             return [
                 (
@@ -152,12 +155,17 @@ def build(tab_students):
                 for r in rows
             ]
 
+        where_clauses = []
+        params = []
         if status_filter == "Active":
-            where = "WHERE s.active = true"
+            where_clauses.append("s.active = true")
         elif status_filter == "Inactive":
-            where = "WHERE s.active = false"
-        else:
-            where = ""
+            where_clauses.append("s.active = false")
+        if name_query:
+            where_clauses.append("s.name ILIKE %s")
+            params.append(f"%{name_query}%")
+        where = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+        params.extend([PAGE_SIZE_STUDENTS, page * PAGE_SIZE_STUDENTS])
 
         return execute(f"""
             SELECT s.id, s.name, s.sex, s.direction, s.postalcode, s.belt, s.email, s.phone, s.phone2,
@@ -167,22 +175,27 @@ def build(tab_students):
             {where}
             ORDER BY s.id
             LIMIT %s OFFSET %s
-        """, (PAGE_SIZE_STUDENTS, page * PAGE_SIZE_STUDENTS))
+        """, tuple(params))
 
     # Count students based on the active filter for pagination.
     def count_students():
         status_filter = filter_active.get()
+        name_query = student_name_query.get().strip()
         if is_api_configured():
-            result = api_count_students(status_filter=status_filter)
+            result = api_count_students(status_filter=status_filter, name_query=name_query)
             return int(result.get("total", 0))
 
+        where_clauses = []
+        params = []
         if status_filter == "Active":
-            where = "WHERE s.active = true"
+            where_clauses.append("s.active = true")
         elif status_filter == "Inactive":
-            where = "WHERE s.active = false"
-        else:
-            where = ""
-        return execute(f"SELECT COUNT(s.id) FROM t_students s {where}")[0][0]
+            where_clauses.append("s.active = false")
+        if name_query:
+            where_clauses.append("s.name ILIKE %s")
+            params.append(f"%{name_query}%")
+        where = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+        return execute(f"SELECT COUNT(s.id) FROM t_students s {where}", tuple(params))[0][0]
 
     # ---------- Form ----------
     form = ttk.LabelFrame(tab_students, text=t("label.student_form"), padding=10)
@@ -794,6 +807,12 @@ def build(tab_students):
     # =====================================================
     # TREEVIEW
     # =====================================================
+    search_list_frame = ttk.Frame(tree_frame)
+    search_list_frame.pack(fill=tk.X, pady=(0, 6))
+    ttk.Label(search_list_frame, text=t("label.search")).pack(side=tk.LEFT, padx=(0, 6))
+    search_entry = ttk.Entry(search_list_frame, textvariable=student_name_query)
+    search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
     students_tree = ttk.Treeview(
         tree_frame,
         columns=("id", "minor", "name", "sex", "direction", "postalcode", "belt", "email", "phone", "phone2", "weight", "country", "taxid", "location", "birthday", "status", "newsletter"),
@@ -1042,7 +1061,13 @@ def build(tab_students):
     lbl_page.grid(row=0, column=1, padx=10)
     ttk.Button(nav, text=t("button.next"), command=next_student).grid(row=0, column=2, padx=5)
 
-    filter_active.trace_add("write", lambda *args: load_students_view())
+    def on_students_filter_change(*_):
+        nonlocal current_student_page
+        current_student_page = 0
+        load_students_view()
+
+    filter_active.trace_add("write", on_students_filter_change)
+    student_name_query.trace_add("write", on_students_filter_change)
 
     return {
         "load_students_view": load_students_view,

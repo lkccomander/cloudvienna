@@ -133,15 +133,25 @@ def _with_auth_request(method, path, payload=None):
     return _request(method, path, payload=payload, token=token)
 
 
-def list_students(limit, offset, status_filter):
+def list_students(limit, offset, status_filter, name_query=""):
     params = urllib.parse.urlencode(
-        {"limit": int(limit), "offset": int(offset), "status_filter": status_filter}
+        {
+            "limit": int(limit),
+            "offset": int(offset),
+            "status_filter": status_filter,
+            "name_query": (name_query or "").strip(),
+        }
     )
     return _with_auth_request("GET", f"/students/list?{params}")
 
 
-def count_students(status_filter):
-    params = urllib.parse.urlencode({"status_filter": status_filter})
+def count_students(status_filter, name_query=""):
+    params = urllib.parse.urlencode(
+        {
+            "status_filter": status_filter,
+            "name_query": (name_query or "").strip(),
+        }
+    )
     return _with_auth_request("GET", f"/students/count?{params}")
 
 
