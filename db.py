@@ -6,6 +6,7 @@ import sys
 import keyring
 import psycopg2
 import tkinter as tk
+from api_client import is_api_configured
 from tkinter import messagebox, simpledialog
 from dotenv import load_dotenv
 from psycopg2 import OperationalError
@@ -205,26 +206,7 @@ def _require(value, name, hint):
     return value
 
 
-_db_settings = _load_db_settings()
-
-_host = os.getenv("DB_HOST") or _db_settings.get("host")
-_port = os.getenv("DB_PORT") or _db_settings.get("port")
-_dbname = os.getenv("DB_NAME") or _db_settings.get("name")
-_sslmode = os.getenv("DB_SSLMODE") or _db_settings.get("sslmode")
-
-_host = _require(_host, "host", "Set DB_HOST or app_settings.json db.host")
-_dbname = _require(_dbname, "name", "Set DB_NAME or app_settings.json db.name")
-_port = _require(_port, "port", "Set DB_PORT or app_settings.json db.port")
-
-_env_user = os.getenv("DB_USER")
-_env_password = os.getenv("DB_PASSWORD")
-
-_user = _env_user or _get_keyring_user()
-_password = _env_password or _get_keyring_password(_env_user or _user)
-
-if not _user or not _password:
-    _user, _password = _prompt_for_credentials(default_user=_user)
-    _save_keyring_credentials(_user, _password)
+_conn = None
 
 def _connect(host, port, dbname, user, password, sslmode):
     return psycopg2.connect(
@@ -237,54 +219,83 @@ def _connect(host, port, dbname, user, password, sslmode):
     )
 
 
-try:
-    _conn = _connect(_host, _port, _dbname, _user, _password, _sslmode)
-except OperationalError as exc:
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes("-topmost", True)
-    should_edit = messagebox.askyesno(
-        "Database Connection Failed",
-        "Database connection failed.\n\nDo you want to edit the DB settings?",
-        parent=root,
-    )
-    root.destroy()
-    if should_edit:
-        new_db_settings = _prompt_for_db_settings(_db_settings or {})
-        settings = _load_app_settings()
-        settings["db"] = new_db_settings
-        _save_app_settings(settings)
-        _db_settings = new_db_settings
-        _host = _db_settings.get("host")
-        _port = _db_settings.get("port")
-        _dbname = _db_settings.get("name")
-        _sslmode = _db_settings.get("sslmode")
-        try:
-            _conn = _connect(_host, _port, _dbname, _user, _password, _sslmode)
-        except OperationalError as exc2:
+def _ensure_connection():
+    global _conn
+    if _conn is not None and not _conn.closed:
+        return _conn
+
+    if is_api_configured():
+        raise RuntimeError("Local DB access is disabled while API mode is configured.")
+
+    db_settings = _load_db_settings()
+    host = os.getenv("DB_HOST") or db_settings.get("host")
+    port = os.getenv("DB_PORT") or db_settings.get("port")
+    dbname = os.getenv("DB_NAME") or db_settings.get("name")
+    sslmode = os.getenv("DB_SSLMODE") or db_settings.get("sslmode")
+
+    host = _require(host, "host", "Set DB_HOST or app_settings.json db.host")
+    dbname = _require(dbname, "name", "Set DB_NAME or app_settings.json db.name")
+    port = _require(port, "port", "Set DB_PORT or app_settings.json db.port")
+
+    env_user = os.getenv("DB_USER")
+    env_password = os.getenv("DB_PASSWORD")
+    user = env_user or _get_keyring_user()
+    password = env_password or _get_keyring_password(env_user or user)
+
+    if not user or not password:
+        user, password = _prompt_for_credentials(default_user=user)
+        _save_keyring_credentials(user, password)
+
+    try:
+        conn = _connect(host, port, dbname, user, password, sslmode)
+    except OperationalError as exc:
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        should_edit = messagebox.askyesno(
+            "Database Connection Failed",
+            "Database connection failed.\n\nDo you want to edit the DB settings?",
+            parent=root,
+        )
+        root.destroy()
+        if should_edit:
+            new_db_settings = _prompt_for_db_settings(db_settings or {})
+            settings = _load_app_settings()
+            settings["db"] = new_db_settings
+            _save_app_settings(settings)
+            host = new_db_settings.get("host")
+            port = new_db_settings.get("port")
+            dbname = new_db_settings.get("name")
+            sslmode = new_db_settings.get("sslmode")
+            try:
+                conn = _connect(host, port, dbname, user, password, sslmode)
+            except OperationalError as exc2:
+                messagebox.showerror(
+                    "Database Connection Failed",
+                    "Unable to connect to the database.\n\n"
+                    f"{exc2}\n\n"
+                    "Tip: If you see 'no pg_hba.conf entry ... no encryption', "
+                    "set sslmode to 'require' or update pg_hba.conf.",
+                )
+                sys.exit(1)
+        else:
             messagebox.showerror(
                 "Database Connection Failed",
                 "Unable to connect to the database.\n\n"
-                f"{exc2}\n\n"
+                f"{exc}\n\n"
                 "Tip: If you see 'no pg_hba.conf entry ... no encryption', "
                 "set sslmode to 'require' or update pg_hba.conf.",
             )
             sys.exit(1)
-    else:
-        messagebox.showerror(
-            "Database Connection Failed",
-            "Unable to connect to the database.\n\n"
-            f"{exc}\n\n"
-            "Tip: If you see 'no pg_hba.conf entry ... no encryption', "
-            "set sslmode to 'require' or update pg_hba.conf.",
-        )
-        sys.exit(1)
 
-_conn.autocommit = True
+    conn.autocommit = True
+    _conn = conn
+    return _conn
 
 
 def execute(query, params=None):
-    with _conn.cursor() as cur:
+    conn = _ensure_connection()
+    with conn.cursor() as cur:
         bound_params = params or ()
         settings = _load_app_settings()
         logging_settings = settings.get("logging", {}) if isinstance(settings.get("logging"), dict) else {}

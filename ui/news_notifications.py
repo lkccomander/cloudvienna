@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 
+from api_client import is_api_configured
 from db import execute
 from i18n import t
 
@@ -46,6 +47,15 @@ def build(tab_news):
     def load_birthdays():
         for r in birthdays_tree.get_children():
             birthdays_tree.delete(r)
+
+        if is_api_configured():
+            birthdays_tree.insert(
+                "",
+                tk.END,
+                values=(t("label.no_data"), "", ""),
+            )
+            count_var.set(t("label.results", count=0))
+            return
 
         rows = execute("""
             SELECT name, belt, birthday, active

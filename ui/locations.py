@@ -53,7 +53,8 @@ def build(tab_locations):
     #    row=0, column=0, columnspan=3, sticky="w", padx=10, pady=10
     #)
     # Build the Locations tab UI and bind handlers.
-    ensure_locations_schema()
+    if not is_api_configured():
+        ensure_locations_schema()
 
     loc_name = tk.StringVar()
     loc_phone = tk.StringVar()

@@ -68,22 +68,23 @@ def build(tab_students):
      #   row=0, column=0, columnspan=3, sticky="w", padx=10, pady=10
     #)
 
-    execute("""
-        ALTER TABLE t_students
-        ADD COLUMN IF NOT EXISTS newsletter_opt_in boolean NOT NULL DEFAULT true
-    """)
-    execute("""
-        ALTER TABLE t_students
-        ADD COLUMN IF NOT EXISTS is_minor boolean NOT NULL DEFAULT false
-    """)
-    execute("""
-        ALTER TABLE t_students
-        ADD COLUMN IF NOT EXISTS guardian_name varchar(120),
-        ADD COLUMN IF NOT EXISTS guardian_email varchar(120),
-        ADD COLUMN IF NOT EXISTS guardian_phone varchar(50),
-        ADD COLUMN IF NOT EXISTS guardian_phone2 varchar(50),
-        ADD COLUMN IF NOT EXISTS guardian_relationship varchar(50)
-    """)
+    if not is_api_configured():
+        execute("""
+            ALTER TABLE t_students
+            ADD COLUMN IF NOT EXISTS newsletter_opt_in boolean NOT NULL DEFAULT true
+        """)
+        execute("""
+            ALTER TABLE t_students
+            ADD COLUMN IF NOT EXISTS is_minor boolean NOT NULL DEFAULT false
+        """)
+        execute("""
+            ALTER TABLE t_students
+            ADD COLUMN IF NOT EXISTS guardian_name varchar(120),
+            ADD COLUMN IF NOT EXISTS guardian_email varchar(120),
+            ADD COLUMN IF NOT EXISTS guardian_phone varchar(50),
+            ADD COLUMN IF NOT EXISTS guardian_phone2 varchar(50),
+            ADD COLUMN IF NOT EXISTS guardian_relationship varchar(50)
+        """)
 
     current_student_page = 0
     selected_student_id = None
