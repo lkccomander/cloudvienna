@@ -53,11 +53,31 @@ def _api_config():
 
 def is_api_configured():
     cfg = _api_config()
-    return bool(cfg["base_url"] and cfg["username"] and cfg["password"])
+    return bool(cfg["base_url"])
 
 
 _TOKEN = None
 _TOKEN_EXP = 0
+_SESSION_USERNAME = ""
+_SESSION_PASSWORD = ""
+_SESSION_USER = None
+
+
+def set_session_credentials(username, password):
+    global _SESSION_USERNAME, _SESSION_PASSWORD, _TOKEN, _TOKEN_EXP, _SESSION_USER
+    _SESSION_USERNAME = (username or "").strip()
+    _SESSION_PASSWORD = password or ""
+    _TOKEN = None
+    _TOKEN_EXP = 0
+    _SESSION_USER = None
+
+
+def clear_session_credentials():
+    set_session_credentials("", "")
+
+
+def get_current_session_user():
+    return dict(_SESSION_USER) if isinstance(_SESSION_USER, dict) else None
 
 
 def _request(method, path, payload=None, token=None):
@@ -99,18 +119,25 @@ def _request(method, path, payload=None, token=None):
 
 
 def _login():
+    global _SESSION_USER
     cfg = _api_config()
-    if not cfg["username"] or not cfg["password"]:
+    username = _SESSION_USERNAME or cfg["username"]
+    password = _SESSION_PASSWORD or cfg["password"]
+    if not username or not password:
         raise ApiError("API username/password are not configured in app_settings.json (api.username/api.password).")
     response = _request(
         "POST",
         "/auth/login",
-        payload={"username": cfg["username"], "password": cfg["password"]},
+        payload={"username": username, "password": password},
     )
     token = response.get("access_token")
     if not token:
         raise ApiError("API login did not return access_token.")
     expires_minutes = int(response.get("expires_in_minutes", 60))
+    _SESSION_USER = {
+        "username": response.get("username", username),
+        "role": response.get("role", ""),
+    }
     return token, time.time() + (expires_minutes * 60)
 
 
@@ -131,6 +158,30 @@ def _with_auth_request(method, path, payload=None):
             raise
     token = _ensure_token(force_refresh=True)
     return _request(method, path, payload=payload, token=token)
+
+
+def login_with_credentials(username, password):
+    set_session_credentials(username, password)
+    _ensure_token(force_refresh=True)
+    me = auth_me()
+    return {
+        "username": me.get("username"),
+        "role": me.get("role"),
+        "active": me.get("active"),
+    }
+
+
+def auth_me():
+    global _SESSION_USER
+    data = _with_auth_request("GET", "/auth/me")
+    if isinstance(data, dict):
+        _SESSION_USER = {
+            "id": data.get("id"),
+            "username": data.get("username"),
+            "role": data.get("role"),
+            "active": data.get("active"),
+        }
+    return data
 
 
 def list_students(limit, offset, status_filter, name_query=""):
@@ -289,3 +340,23 @@ def reports_students_search(payload):
 
 def reports_students_export(payload):
     return _with_auth_request("POST", "/reports/students/export", payload=payload)
+
+
+def list_api_users():
+    return _with_auth_request("GET", "/users/list")
+
+
+def create_api_user(payload):
+    return _with_auth_request("POST", "/users/create", payload=payload)
+
+
+def update_api_user(user_id, payload):
+    return _with_auth_request("PUT", f"/users/{int(user_id)}", payload=payload)
+
+
+def reset_api_user_password(user_id, new_password):
+    return _with_auth_request(
+        "POST",
+        f"/users/{int(user_id)}/reset-password",
+        payload={"new_password": new_password},
+    )
