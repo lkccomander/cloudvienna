@@ -279,6 +279,10 @@ def attendance_by_student(student_id):
     return _with_auth_request("GET", f"/attendance/by-student/{int(student_id)}")
 
 
+def news_birthdays():
+    return _with_auth_request("GET", "/news/birthdays")
+
+
 def reports_students_search(payload):
     return _with_auth_request("POST", "/reports/students/search", payload=payload)
 

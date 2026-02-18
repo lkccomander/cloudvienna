@@ -1,0 +1,39 @@
+BJJ Vienna (Desktop + API)
+
+Purpose
+- Desktop app for BJJ academy operations (students, teachers, locations, sessions, attendance, reports).
+- Main stack: Python, Tkinter UI, PostgreSQL.
+- Optional API: FastAPI attendance endpoints.
+
+Tech Stack
+- Python 3.x
+- Tkinter UI modules in `ui/`
+- PostgreSQL via `psycopg2`
+- FastAPI in `main.py` / `backend/`
+- i18n JSON files in `i18n/`
+
+Important Files
+- `gui.py`: Main desktop entrypoint (tabbed UI).
+- `db.py`: DB connection and SQL execution helper.
+- `ui/*.py`: Feature-specific tabs and forms.
+- `i18n.py`: Localization loader and language persistence.
+- `app_settings.json`: Local app/user config.
+- `ARCHITECTURE.md`: Architecture and data model summary.
+- `requirements.txt`: Python dependencies.
+- `tests/test_validation.py`: Existing tests.
+
+Run / Test
+- Desktop app: `python gui.py`
+- API: `python main.py` or `python backend/main.py`
+- Tests: `pytest -q`
+
+Project Conventions
+- Keep UI logic in `ui/` modules; avoid mixing unrelated concerns.
+- Reuse `db.py` data access utilities for SQL operations.
+- Preserve i18n keys and update `i18n/en.json` and `i18n/de-AT.json` together when adding UI text.
+- Avoid committing secrets; use `.env*` and credential manager patterns already in place.
+
+Agent Notes
+- Read `ARCHITECTURE.md` before larger refactors.
+- Prefer small, targeted changes and keep behavior backward-compatible.
+- If touching reports/export behavior, verify CSV/PDF/Excel flows.

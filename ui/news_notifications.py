@@ -1,7 +1,7 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 
-from api_client import is_api_configured
+from api_client import ApiError, is_api_configured, news_birthdays as api_news_birthdays
 from db import execute
 from i18n import t
 
@@ -49,21 +49,28 @@ def build(tab_news):
             birthdays_tree.delete(r)
 
         if is_api_configured():
-            birthdays_tree.insert(
-                "",
-                tk.END,
-                values=(t("label.no_data"), "", ""),
-            )
-            count_var.set(t("label.results", count=0))
-            return
-
-        rows = execute("""
-            SELECT name, belt, birthday, active
-            FROM t_students
-            WHERE birthday IS NOT NULL
-              AND EXTRACT(MONTH FROM birthday) = EXTRACT(MONTH FROM CURRENT_DATE)
-            ORDER BY EXTRACT(DAY FROM birthday), name
-        """)
+            try:
+                api_rows = api_news_birthdays()
+                rows = [
+                    (
+                        r.get("name"),
+                        r.get("belt"),
+                        r.get("birthday"),
+                        r.get("active"),
+                    )
+                    for r in api_rows
+                ]
+            except ApiError as ae:
+                messagebox.showerror("API error", str(ae))
+                rows = []
+        else:
+            rows = execute("""
+                SELECT name, belt, birthday, active
+                FROM t_students
+                WHERE birthday IS NOT NULL
+                  AND EXTRACT(MONTH FROM birthday) = EXTRACT(MONTH FROM CURRENT_DATE)
+                ORDER BY EXTRACT(DAY FROM birthday), name
+            """)
 
         if not rows:
             birthdays_tree.insert(

@@ -12,6 +12,7 @@ from backend.schemas import (
     ApiUserOut,
     AttendanceRegisterIn,
     AttendanceRow,
+    BirthdayNotificationRow,
     ClassIn,
     ClassOut,
     CountResponse,
@@ -227,6 +228,20 @@ def _build_reports_student_filters(payload: ReportsStudentSearchIn):
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/news/birthdays", response_model=list[BirthdayNotificationRow])
+def news_birthdays(_: str = Depends(_require_auth)):
+    rows = fetch_all(
+        """
+        SELECT s.name, s.belt, s.birthday, s.active
+        FROM t_students s
+        WHERE s.birthday IS NOT NULL
+          AND EXTRACT(MONTH FROM s.birthday) = EXTRACT(MONTH FROM CURRENT_DATE)
+        ORDER BY EXTRACT(DAY FROM s.birthday), s.name
+        """
+    )
+    return [BirthdayNotificationRow.model_validate(row) for row in rows]
 
 
 @app.post("/reports/students/search", response_model=ReportsStudentSearchOut)

@@ -205,6 +205,15 @@ class AttendanceRow(BaseModel):
     c3: str
 
 
+class BirthdayNotificationRow(BaseModel):
+    name: Optional[str] = None
+    belt: Optional[str] = None
+    birthday: Optional[date] = None
+    active: Optional[bool] = True
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ReportsStudentSearchIn(BaseModel):
     term: str = ""
     location_id: Optional[int] = None
