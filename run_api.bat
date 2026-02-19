@@ -12,4 +12,16 @@ if not exist ".venv\Scripts\activate" (
 )
 
 call ".venv\Scripts\activate"
+
+REM Auto-install dependencies only if key API packages are missing.
+python -c "import fastapi,uvicorn,dotenv" >nul 2>&1
+if errorlevel 1 (
+    echo [INFO] Missing dependencies detected. Installing from requirements.txt...
+    python -m pip install -r requirements.txt
+    if errorlevel 1 (
+        echo [ERROR] Dependency installation failed.
+        exit /b 1
+    )
+)
+
 python -m backend.run

@@ -55,6 +55,11 @@ app = FastAPI(title="BJJ Vienna API", version="0.1.0")
 auth_scheme = HTTPBearer(auto_error=True)
 
 
+@app.get("/")
+def root():
+    return {"status": "ok", "service": "bjj-vienna-api"}
+
+
 @app.on_event("startup")
 def startup_migrations():
     # Keep API resilient with legacy databases used by the current desktop app.
