@@ -250,30 +250,14 @@ def build(tab_about):
                 log_text.insert(tk.END, line)
         log_text.config(state="disabled")
 
-    capture_psql_var = tk.BooleanVar(value=False)
-
-    def _load_capture_psql_setting():
-        settings_data = _load_settings()
-        logging_cfg = settings_data.get("logging", {}) if isinstance(settings_data.get("logging"), dict) else {}
-        capture_psql_var.set(bool(logging_cfg.get("capture_psql", False)))
-
-    def _save_capture_psql_setting():
-        settings_data = _load_settings()
-        logging_cfg = settings_data.get("logging", {}) if isinstance(settings_data.get("logging"), dict) else {}
-        logging_cfg["capture_psql"] = bool(capture_psql_var.get())
-        settings_data["logging"] = logging_cfg
-        _save_settings(settings_data)
-
-    _load_capture_psql_setting()
-
     ttk.Button(logs_frame, text=t("button.refresh_logs"), command=refresh_logs).grid(
         row=2, column=0, sticky="w", pady=(6, 0)
     )
-    ttk.Checkbutton(
+    ttk.Label(
         logs_frame,
-        text=t("settings.app.capture_psql"),
-        variable=capture_psql_var,
-        command=_save_capture_psql_setting,
+        text=t("settings.app.sql_capture_note"),
+        justify="right",
+        wraplength=520,
     ).grid(row=2, column=1, sticky="e", pady=(6, 0))
 
     return {"refresh_about_panel": refresh_about_panel}

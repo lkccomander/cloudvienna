@@ -1,7 +1,38 @@
 import tkinter as tk
 from tkinter import ttk, colorchooser, messagebox
+import json
+import os
+import sys
 
+from api_client import ApiError, get_my_preferences, is_api_configured, save_my_preferences
 from i18n import t, get_language, set_language
+
+
+def _resolve_settings_path():
+    if getattr(sys, "frozen", False):
+        return os.path.join(os.path.dirname(sys.executable), "app_settings.json")
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "app_settings.json")
+
+
+def _load_app_settings():
+    path = os.path.abspath(_resolve_settings_path())
+    try:
+        with open(path, "r", encoding="utf-8-sig") as handle:
+            data = json.load(handle)
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_app_settings(settings):
+    path = os.path.abspath(_resolve_settings_path())
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(settings, handle, indent=2, sort_keys=True)
+
+
+def _is_api_not_found(exc):
+    return "API 404:" in str(exc)
+
 
 def _apply_palette(style, palette):
     if palette is None:
@@ -47,6 +78,9 @@ def build(tab_settings, style):
     #    row=0, column=0, columnspan=3, sticky="w", padx=10, pady=10
     #)
     root = tab_settings.winfo_toplevel()
+    api_mode = is_api_configured()
+    current_language = {"code": get_language()}
+    is_loading = {"value": True}
 
     header = ttk.Label(tab_settings, text=t("settings.header"), font=("Segoe UI", 12, "bold"))
     header.grid(row=1, column=0, sticky="w", padx=10, pady=(0, 10))
@@ -84,7 +118,31 @@ def build(tab_settings, style):
         "dark": dict(default_palettes["dark"]),
     }
 
-    def apply_theme(value):
+    def _persist_preferences():
+        if is_loading["value"]:
+            return
+        payload = {
+            "theme": theme_var.get(),
+            "language": current_language["code"],
+            "palette_light": dict(palettes["light"]),
+            "palette_dark": dict(palettes["dark"]),
+        }
+        if api_mode:
+            try:
+                save_my_preferences(payload)
+            except ApiError as exc:
+                if _is_api_not_found(exc):
+                    settings_data = _load_app_settings()
+                    settings_data["ui_preferences"] = payload
+                    _save_app_settings(settings_data)
+                    return
+                messagebox.showerror(t("alert.api_error_title"), str(exc))
+        else:
+            settings_data = _load_app_settings()
+            settings_data["ui_preferences"] = payload
+            _save_app_settings(settings_data)
+
+    def apply_theme(value, persist=True):
         if value == "light":
             style.theme_use("clam")
             _apply_palette(style, palettes["light"])
@@ -95,6 +153,8 @@ def build(tab_settings, style):
             _apply_palette(style, palettes["dark"])
             root.configure(bg=palettes["dark"]["bg"])
             current_theme_label.config(text=t("settings.current_theme", theme=t("theme.dark")))
+        if persist:
+            _persist_preferences()
 
     options_frame = ttk.LabelFrame(tab_settings, text=t("settings.choose_theme"), padding=10)
     options_frame.grid(row=3, column=0, sticky="ew", padx=10)
@@ -136,14 +196,21 @@ def build(tab_settings, style):
     language_cb.set(current_lang_label)
     language_cb.grid(row=0, column=0, sticky="w")
 
-    def apply_language_change(event=None):
+    def apply_language_change():
         selected_label = language_cb.get()
         code = language_options.get(selected_label, "en")
-        if code != get_language():
-            set_language(code)
-            messagebox.showinfo(t("settings.language.label"), t("settings.language.note"))
+        current_language["code"] = code
+        # Always persist locally so init_i18n() can load it on next startup.
+        set_language(code, persist=True)
+        # Also persist in API/local preferences payload.
+        _persist_preferences()
+        messagebox.showinfo(t("settings.language.label"), t("settings.language.note"))
 
-    language_cb.bind("<<ComboboxSelected>>", apply_language_change)
+    ttk.Button(
+        language_frame,
+        text=t("settings.language.apply"),
+        command=apply_language_change,
+    ).grid(row=0, column=1, sticky="w", padx=(8, 0))
 
     editor_frame = ttk.LabelFrame(tab_settings, text=t("settings.edit_theme_colors"), padding=10)
     editor_frame.grid(row=5, column=0, sticky="ew", padx=10, pady=(10, 0))
@@ -192,7 +259,8 @@ def build(tab_settings, style):
         for theme_key in ("light", "dark"):
             for key, _ in color_fields:
                 palettes[theme_key][key] = palette_vars[theme_key][key].get().strip()
-        apply_theme(theme_var.get())
+        apply_theme(theme_var.get(), persist=False)
+        _persist_preferences()
 
     def reset_defaults():
         for theme_key in ("light", "dark"):
@@ -205,7 +273,50 @@ def build(tab_settings, style):
     ttk.Button(actions, text=t("settings.apply_colors"), command=apply_custom_colors).grid(row=0, column=0, padx=(0, 8))
     ttk.Button(actions, text=t("settings.reset_defaults"), command=reset_defaults).grid(row=0, column=1)
 
-    apply_theme(theme_var.get())
+    persisted = {}
+    if api_mode:
+        try:
+            persisted = get_my_preferences()
+        except ApiError as exc:
+            if _is_api_not_found(exc):
+                persisted = _load_app_settings().get("ui_preferences", {})
+            else:
+                persisted = {}
+    else:
+        persisted = _load_app_settings().get("ui_preferences", {})
+
+    if isinstance(persisted, dict):
+        persisted_theme = (persisted.get("theme") or "light").strip().lower()
+        if persisted_theme in ("light", "dark"):
+            theme_var.set(persisted_theme)
+
+        persisted_lang = (persisted.get("language") or current_language["code"]).strip()
+        if persisted_lang:
+            current_language["code"] = persisted_lang
+            # Keep top-level app_settings language in sync for startup init_i18n().
+            set_language(persisted_lang, persist=True)
+
+        for theme_key in ("light", "dark"):
+            palette_payload = persisted.get(f"palette_{theme_key}")
+            if not isinstance(palette_payload, dict):
+                continue
+            for key in default_palettes[theme_key].keys():
+                value = palette_payload.get(key)
+                if isinstance(value, str) and value.strip():
+                    palettes[theme_key][key] = value.strip()
+
+    for theme_key in ("light", "dark"):
+        for key, _ in color_fields:
+            palette_vars[theme_key][key].set(palettes[theme_key][key])
+
+    current_lang_label = next(
+        (label for label, code in language_options.items() if code == current_language["code"]),
+        "English",
+    )
+    language_cb.set(current_lang_label)
+
+    apply_theme(theme_var.get(), persist=False)
+    is_loading["value"] = False
 
     tab_settings.grid_columnconfigure(0, weight=1)
 

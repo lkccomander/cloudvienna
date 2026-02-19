@@ -53,6 +53,20 @@ class AuthUserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class UserPreferencesIn(BaseModel):
+    theme: Literal["light", "dark"] = "light"
+    language: str = Field(default="en", min_length=2, max_length=20)
+    palette_light: dict[str, str] = Field(default_factory=dict)
+    palette_dark: dict[str, str] = Field(default_factory=dict)
+
+
+class UserPreferencesOut(BaseModel):
+    theme: Literal["light", "dark"] = "light"
+    language: str = "en"
+    palette_light: dict[str, str] = Field(default_factory=dict)
+    palette_dark: dict[str, str] = Field(default_factory=dict)
+
+
 class StudentCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     sex: str = Field(description="M, F, or NA")

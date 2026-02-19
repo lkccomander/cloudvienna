@@ -1,6 +1,13 @@
 import pytest
 from datetime import date, timedelta
 
+from pydantic import ValidationError as PydanticValidationError
+from backend.schemas import (
+    ApiUserCreateIn,
+    ReportsStudentSearchIn,
+    StudentCreateRequest,
+    UserPreferencesIn,
+)
 from validation_middleware import (
     ValidationError,
     validate_required,
@@ -80,6 +87,68 @@ def test_full_student_registration_valid():
         validate_optional_email(student_data["email"])
     else:
         validate_email(student_data["email"])
+
+
+# ---------------------------
+# API schema validation tests
+# ---------------------------
+def test_api_student_create_request_defaults():
+    payload = StudentCreateRequest(name="Ana Silva", sex="F", email="ana@example.com")
+
+    assert payload.country == "Austria"
+    assert payload.newsletter_opt_in is True
+    assert payload.is_minor is False
+
+
+def test_api_student_create_request_requires_name():
+    with pytest.raises(PydanticValidationError):
+        StudentCreateRequest(name="", sex="F", email="ana@example.com")
+
+
+def test_api_reports_student_search_defaults():
+    payload = ReportsStudentSearchIn()
+
+    assert payload.limit == 50
+    assert payload.offset == 0
+    assert payload.no_location is False
+    assert payload.is_minor_only is False
+
+
+def test_api_reports_student_search_limit_too_high():
+    with pytest.raises(PydanticValidationError):
+        ReportsStudentSearchIn(limit=501)
+
+
+def test_api_reports_student_search_offset_negative():
+    with pytest.raises(PydanticValidationError):
+        ReportsStudentSearchIn(offset=-1)
+
+
+def test_api_user_create_rejects_short_password():
+    with pytest.raises(PydanticValidationError):
+        ApiUserCreateIn(username="coach1", password="short", role="teacher")
+
+
+def test_api_user_preferences_accept_valid_payload():
+    payload = UserPreferencesIn(
+        theme="dark",
+        language="en",
+        palette_light={"bg": "#ffffff"},
+        palette_dark={"bg": "#111111"},
+    )
+
+    assert payload.theme == "dark"
+    assert payload.language == "en"
+
+
+def test_api_user_preferences_reject_invalid_theme():
+    with pytest.raises(PydanticValidationError):
+        UserPreferencesIn(theme="blue", language="en")
+
+
+def test_api_user_preferences_reject_short_language():
+    with pytest.raises(PydanticValidationError):
+        UserPreferencesIn(theme="light", language="e")
 
 # ---------------------------
 # Newsletter defaults

@@ -1,13 +1,68 @@
 import logging
 import os
+import re
+import subprocess
+import sys
 import tkinter as tk
 import traceback
 from tkinter import messagebox, ttk
 
-from api_client import ApiError, is_api_configured, login_with_credentials
+from api_client import ApiError, clear_session_credentials, is_api_configured, login_with_credentials
 from version import __version__
 from i18n import init_i18n, t
-from ui import about, attendance, locations, news_notifications, reports, sessions, settings, students, teachers
+from ui import about, attendance, locations, news_notifications, reports, sessions, settings, students, teachers, users
+
+
+def _run_pre_login_tests() -> bool:
+    print("\n=== PRE-TEST START ===")
+    print("Running test suite before login screen...")
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest", "-rA", "-vv"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            check=False,
+        )
+    except Exception as exc:
+        print(f"❌ Pre-test execution error: {exc}")
+        print("=== PRE-TEST END ===\n")
+        return False
+
+    if result.stdout:
+        print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
+    if result.stderr:
+        print(result.stderr, end="" if result.stderr.endswith("\n") else "\n")
+
+    # Show per-test status markers for quick scan in console.
+    test_status_pattern = re.compile(
+        r"^(?P<name>\S.*::\S+)\s+(?P<status>PASSED|FAILED|ERROR|SKIPPED|XFAIL|XPASS)\b"
+    )
+    parsed_any = False
+    print("\nPer-test results:")
+    for line in result.stdout.splitlines():
+        match = test_status_pattern.match(line.strip())
+        if not match:
+            continue
+        parsed_any = True
+        test_name = match.group("name")
+        status = match.group("status")
+        if status == "PASSED":
+            marker = "✅"
+        elif status in {"FAILED", "ERROR"}:
+            marker = "❌"
+        else:
+            marker = "•"
+        print(f"{marker} {test_name} [{status}]")
+    if not parsed_any:
+        print("• No individual test lines parsed from pytest output.")
+
+    if result.returncode == 0:
+        print("✅ Pre-test passed")
+    else:
+        print(f"❌ Pre-test failed (exit code {result.returncode})")
+    print("=== PRE-TEST END ===\n")
+    return result.returncode == 0
 
 
 def _resolve_login_bg_path() -> str:
@@ -123,6 +178,23 @@ def _require_api_login(root: tk.Tk):
         return current_user
 
 
+def _restart_application():
+    if getattr(sys, "frozen", False):
+        cmd = [sys.executable]
+    else:
+        cmd = [sys.executable, *sys.argv]
+
+    popen_kwargs = {
+        "cwd": os.path.dirname(os.path.abspath(__file__)),
+    }
+    if os.name == "nt":
+        creationflags = 0
+        creationflags |= getattr(subprocess, "DETACHED_PROCESS", 0)
+        creationflags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        popen_kwargs["creationflags"] = creationflags
+    subprocess.Popen(cmd, **popen_kwargs)
+
+
 def main():
     logging.basicConfig(
         level=logging.ERROR,
@@ -137,6 +209,7 @@ def main():
     
 
     try:
+        _run_pre_login_tests()
         init_i18n()
         root = tk.Tk()
         root.withdraw()
@@ -162,6 +235,7 @@ def main():
         tab_sessions = ttk.Frame(notebook, padding=10)
         tab_news = ttk.Frame(notebook, padding=10)
         tab_reports = ttk.Frame(notebook, padding=10)
+        tab_users = ttk.Frame(notebook, padding=10)
         tab_settings = ttk.Frame(notebook, padding=10)
         tab_about = ttk.Frame(notebook, padding=10)
 
@@ -172,15 +246,31 @@ def main():
         notebook.add(tab_sessions, text=t("tab.sessions"))
         notebook.add(tab_news, text=t("tab.news_notifications"))
         notebook.add(tab_reports, text=t("tab.reports"))
+        notebook.add(tab_users, text=t("tab.users"))
         notebook.add(tab_settings, text=t("tab.settings"))
         notebook.add(tab_about, text=t("tab.about"))
 
-        root.title(f"{t('app.title')} v{__version__}")
-        if current_user and current_user.get("username"):
-            role = (current_user.get("role") or "").strip()
-            root.title(f"{t('app.title')} v{__version__} | {current_user['username']} ({role})")
-            if role != "admin":
-                notebook.tab(tab_settings, state="disabled")
+        def _apply_user_ui_state():
+            root.title(f"{t('app.title')} v{__version__}")
+            notebook.tab(tab_settings, state="normal")
+            notebook.tab(tab_users, state="hidden")
+            if current_user and current_user.get("username"):
+                role = (current_user.get("role") or "").strip()
+                root.title(f"{t('app.title')} v{__version__} | {current_user['username']} ({role})")
+                if role == "admin":
+                    notebook.tab(tab_users, state="normal")
+
+        if is_api_configured():
+            def _logout_and_relogin():
+                clear_session_credentials()
+                root.destroy()
+                _restart_application()
+                raise SystemExit(0)
+
+            logout_btn = ttk.Button(root, text=t("button.logout"), command=_logout_and_relogin)
+            logout_btn.place(relx=1.0, x=-12, y=10, anchor="ne")
+
+        _apply_user_ui_state()
 
         teachers_api = teachers.build(tab_teachers)
         locations_api = locations.build(tab_locations)
@@ -189,6 +279,7 @@ def main():
         sessions_api = sessions.build(tab_sessions)
         news_api = news_notifications.build(tab_news)
         reports.build(tab_reports)
+        users_api = users.build(tab_users)
         settings.build(tab_settings, style)
         about_api = about.build(tab_about)
 
@@ -201,6 +292,8 @@ def main():
         sessions_api["load_classes"]()
         sessions_api["load_sessions"]()
         news_api["load_birthdays"]()
+        if current_user and (current_user.get("role") or "").strip() == "admin":
+            users_api["load_users"]()
         about_api["refresh_about_panel"]()
 
         root.deiconify()

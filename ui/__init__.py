@@ -6,6 +6,7 @@ from . import reports
 from . import sessions
 from . import students
 from . import teachers
+from . import users
 
 __all__ = [
     "about",
@@ -16,4 +17,5 @@ __all__ = [
     "sessions",
     "students",
     "teachers",
+    "users",
 ]

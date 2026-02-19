@@ -1,3 +1,5 @@
+import json
+
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -15,6 +17,8 @@ from backend.schemas import (
     AttendanceRegisterIn,
     AttendanceRow,
     AuthUserOut,
+    UserPreferencesIn,
+    UserPreferencesOut,
     BirthdayNotificationRow,
     ClassIn,
     ClassOut,
@@ -202,6 +206,18 @@ def startup_migrations():
             API_ADMIN_USER.strip(),
             hash_password(API_ADMIN_PASSWORD),
         ),
+    )
+    execute(
+        """
+        CREATE TABLE IF NOT EXISTS t_api_user_preferences (
+            user_id integer PRIMARY KEY REFERENCES t_api_users(id) ON DELETE CASCADE,
+            theme varchar(20) NOT NULL DEFAULT 'light',
+            language varchar(20) NOT NULL DEFAULT 'en',
+            palette_light jsonb,
+            palette_dark jsonb,
+            updated_at timestamp NOT NULL DEFAULT now()
+        )
+        """
     )
 
 
@@ -408,6 +424,67 @@ def login(payload: LoginRequest):
 def auth_me(subject: str = Depends(_require_auth)):
     row = _get_user_by_subject(subject)
     return AuthUserOut.model_validate(row)
+
+
+@app.get("/users/me/preferences", response_model=UserPreferencesOut)
+def get_my_preferences(subject: str = Depends(_require_auth)):
+    user = _get_user_by_subject(subject)
+    row = fetch_one(
+        """
+        SELECT theme, language, palette_light, palette_dark
+        FROM t_api_user_preferences
+        WHERE user_id = %s
+        """,
+        (user["id"],),
+    )
+    if not row:
+        return UserPreferencesOut()
+    return UserPreferencesOut.model_validate(
+        {
+            "theme": row.get("theme") or "light",
+            "language": row.get("language") or "en",
+            "palette_light": row.get("palette_light") or {},
+            "palette_dark": row.get("palette_dark") or {},
+        }
+    )
+
+
+@app.put("/users/me/preferences", response_model=UserPreferencesOut)
+def upsert_my_preferences(
+    payload: UserPreferencesIn,
+    subject: str = Depends(_require_auth),
+):
+    user = _get_user_by_subject(subject)
+    palette_light_json = json.dumps(payload.palette_light or {})
+    palette_dark_json = json.dumps(payload.palette_dark or {})
+    row = execute_returning_one(
+        """
+        INSERT INTO t_api_user_preferences (user_id, theme, language, palette_light, palette_dark, updated_at)
+        VALUES (%s, %s, %s, %s::jsonb, %s::jsonb, now())
+        ON CONFLICT (user_id) DO UPDATE
+        SET theme = EXCLUDED.theme,
+            language = EXCLUDED.language,
+            palette_light = EXCLUDED.palette_light,
+            palette_dark = EXCLUDED.palette_dark,
+            updated_at = now()
+        RETURNING theme, language, palette_light, palette_dark
+        """,
+        (
+            user["id"],
+            payload.theme,
+            payload.language.strip() or "en",
+            palette_light_json,
+            palette_dark_json,
+        ),
+    )
+    return UserPreferencesOut.model_validate(
+        {
+            "theme": row.get("theme") or "light",
+            "language": row.get("language") or "en",
+            "palette_light": row.get("palette_light") or {},
+            "palette_dark": row.get("palette_dark") or {},
+        }
+    )
 
 
 @app.get("/users/list", response_model=list[ApiUserOut])

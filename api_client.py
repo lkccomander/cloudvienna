@@ -360,3 +360,11 @@ def reset_api_user_password(user_id, new_password):
         f"/users/{int(user_id)}/reset-password",
         payload={"new_password": new_password},
     )
+
+
+def get_my_preferences():
+    return _with_auth_request("GET", "/users/me/preferences")
+
+
+def save_my_preferences(payload):
+    return _with_auth_request("PUT", "/users/me/preferences", payload=payload)
