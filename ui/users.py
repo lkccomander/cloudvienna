@@ -11,12 +11,12 @@ from api_client import (
 from i18n import t
 
 
-ROLE_OPTIONS = ("admin", "teacher", "readonly")
+ROLE_OPTIONS = ("admin", "coach", "receptionist")
 
 
 def build(tab_users):
     us_username = tk.StringVar()
-    us_role = tk.StringVar(value="teacher")
+    us_role = tk.StringVar(value="coach")
     us_password = tk.StringVar()
 
     selected_user_id = None
@@ -112,7 +112,7 @@ def build(tab_users):
         selected_user_id = None
         selected_user_active = None
         us_username.set("")
-        us_role.set("teacher")
+        us_role.set("coach")
         us_password.set("")
         users_tree.selection_remove(*users_tree.selection())
         _set_button_states()
@@ -157,7 +157,7 @@ def build(tab_users):
             return
         selected_user_id = int(values[0])
         us_username.set(values[1] or "")
-        selected_role = values[2] if values[2] in ROLE_OPTIONS else "teacher"
+        selected_role = values[2] if values[2] in ROLE_OPTIONS else "coach"
         us_role.set(selected_role)
         us_password.set("")
         selected_user_active = users_tree.item(selected[0]).get("tags", ("inactive",))[0] == "active"
@@ -187,12 +187,24 @@ def build(tab_users):
         if selected_user_id is None:
             messagebox.showerror(t("alert.validation_title"), t("alert.select_user"))
             return
+        username = us_username.get().strip()
         role = us_role.get().strip()
+        password = us_password.get()
+        if len(username) < 3:
+            messagebox.showerror(t("alert.validation_title"), t("alert.username_min"))
+            return
         if not _validate_role(role):
             messagebox.showerror(t("alert.validation_title"), t("alert.invalid_role"))
             return
+        if password and len(password) < 10:
+            messagebox.showerror(t("alert.validation_title"), t("alert.password_min"))
+            return
+        payload = {"username": username, "role": role}
+        if password:
+            payload["new_password"] = password
         try:
-            update_api_user(selected_user_id, {"role": role})
+            update_api_user(selected_user_id, payload)
+            us_password.set("")
             load_users()
         except ApiError as exc:
             messagebox.showerror(t("alert.api_error_title"), str(exc))

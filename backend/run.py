@@ -1,9 +1,14 @@
 from backend.config import (
+    APP_ENV,
     API_HOST,
     API_PORT,
     API_PROXY_HEADERS,
     API_TLS_CERTFILE,
     API_TLS_KEYFILE,
+    DB_HOST,
+    DB_NAME,
+    DB_PORT,
+    ENV_FILES_PRESENT,
 )
 
 
@@ -19,6 +24,12 @@ def _ssl_kwargs() -> dict:
 
 def main():
     import uvicorn
+
+    env_sources = ", ".join(ENV_FILES_PRESENT) if ENV_FILES_PRESENT else "none"
+    print(
+        f"[backend] startup env={APP_ENV} db={DB_NAME}@{DB_HOST}:{DB_PORT} "
+        f"env_files={env_sources}"
+    )
 
     uvicorn.run(
         "backend.main:app",

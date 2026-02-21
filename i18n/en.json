@@ -173,9 +173,13 @@
   "label.created_at": "Created At",
   "label.password": "Password",
   "alert.api_error_title": "API error",
+  "alert.api_required_title": "API required",
+  "alert.api_required_message": "This client runs in API-only mode. Configure api.base_url in app_settings.json.",
+  "alert.startup_error_title": "Startup error",
+  "alert.startup_error_message": "The app failed to start. Check app.log for details.",
   "alert.validation_title": "Validation error",
   "alert.select_user": "Please select a user first.",
   "alert.username_min": "Username must be at least 3 characters.",
   "alert.password_min": "Password must be at least 10 characters.",
-  "alert.invalid_role": "Role must be one of: admin, teacher, readonly."
+  "alert.invalid_role": "Role must be one of: admin, coach, receptionist."
 }

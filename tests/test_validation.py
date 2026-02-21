@@ -126,7 +126,7 @@ def test_api_reports_student_search_offset_negative():
 
 def test_api_user_create_rejects_short_password():
     with pytest.raises(PydanticValidationError):
-        ApiUserCreateIn(username="coach1", password="short", role="teacher")
+        ApiUserCreateIn(username="coach1", password="short", role="coach")
 
 
 def test_api_user_preferences_accept_valid_payload():

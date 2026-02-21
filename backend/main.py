@@ -149,8 +149,8 @@ def startup_migrations():
         INSERT INTO t_api_roles (role_key, role_name)
         VALUES
             ('admin', 'Administrator'),
-            ('teacher', 'Teacher'),
-            ('readonly', 'Read only')
+            ('coach', 'Coach'),
+            ('receptionist', 'Receptionist')
         ON CONFLICT (role_key) DO UPDATE
         SET role_name = EXCLUDED.role_name
         """
@@ -161,7 +161,7 @@ def startup_migrations():
             id serial PRIMARY KEY,
             username varchar(60) NOT NULL UNIQUE,
             password_hash text NOT NULL,
-            role varchar(20) NOT NULL DEFAULT 'teacher',
+            role varchar(20) NOT NULL DEFAULT 'coach',
             active boolean NOT NULL DEFAULT true,
             created_at timestamp NOT NULL DEFAULT now(),
             updated_at timestamp
@@ -172,8 +172,10 @@ def startup_migrations():
         """
         UPDATE t_api_users
         SET role = CASE
-            WHEN role = 'operator' THEN 'teacher'
-            WHEN role = 'viewer' THEN 'readonly'
+            WHEN role = 'operator' THEN 'coach'
+            WHEN role = 'viewer' THEN 'receptionist'
+            WHEN role = 'teacher' THEN 'coach'
+            WHEN role = 'readonly' THEN 'receptionist'
             ELSE role
         END
         """
@@ -181,7 +183,7 @@ def startup_migrations():
     execute(
         """
         ALTER TABLE t_api_users
-        ALTER COLUMN role SET DEFAULT 'teacher'
+        ALTER COLUMN role SET DEFAULT 'coach'
         """
     )
     execute(
@@ -202,8 +204,7 @@ def startup_migrations():
         INSERT INTO t_api_users (username, password_hash, role, active)
         VALUES (%s, %s, 'admin', TRUE)
         ON CONFLICT (username) DO UPDATE
-        SET password_hash = EXCLUDED.password_hash,
-            role = 'admin',
+        SET role = 'admin',
             active = TRUE,
             updated_at = now()
         """,
@@ -271,7 +272,7 @@ def _require_admin(subject: str = Depends(_require_auth)) -> str:
 
 def _require_write_access(subject: str = Depends(_require_auth)) -> str:
     row = _get_user_by_subject(subject)
-    if row.get("role") not in ("admin", "teacher"):
+    if row.get("role") not in ("admin", "coach"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Write role required",
@@ -411,12 +412,22 @@ def login(payload: LoginRequest):
         """,
         (username,),
     )
-    if not row or not row.get("active") or not verify_password(payload.password, row["password_hash"]):
+    if not row:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
-    token = create_access_token(subject=username)
+    if not row.get("active"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inactive user",
+        )
+    if not verify_password(payload.password, row["password_hash"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+        )
+    token = create_access_token(subject=row["username"])
     return TokenResponse(
         access_token=token,
         expires_in_minutes=API_TOKEN_MINUTES,
@@ -537,20 +548,48 @@ def update_user(user_id: int, payload: ApiUserUpdateIn, _: str = Depends(_requir
     if not existing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
+    username = payload.username.strip() if payload.username is not None else existing["username"]
     role = payload.role if payload.role is not None else existing["role"]
     active = payload.active if payload.active is not None else existing["active"]
 
-    row = execute_returning_one(
+    username_conflict = fetch_one(
         """
-        UPDATE t_api_users
-        SET role = %s,
-            active = %s,
-            updated_at = now()
-        WHERE id = %s
-        RETURNING id, username, role, active, created_at
+        SELECT id
+        FROM t_api_users
+        WHERE username = %s AND id <> %s
         """,
-        (role, active, user_id),
+        (username, user_id),
     )
+    if username_conflict:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
+
+    if payload.new_password is not None:
+        row = execute_returning_one(
+            """
+            UPDATE t_api_users
+            SET username = %s,
+                role = %s,
+                active = %s,
+                password_hash = %s,
+                updated_at = now()
+            WHERE id = %s
+            RETURNING id, username, role, active, created_at
+            """,
+            (username, role, active, hash_password(payload.new_password), user_id),
+        )
+    else:
+        row = execute_returning_one(
+            """
+            UPDATE t_api_users
+            SET username = %s,
+                role = %s,
+                active = %s,
+                updated_at = now()
+            WHERE id = %s
+            RETURNING id, username, role, active, created_at
+            """,
+            (username, role, active, user_id),
+        )
     return ApiUserOut.model_validate(row)
 
 

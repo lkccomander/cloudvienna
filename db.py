@@ -98,6 +98,21 @@ def _load_db_settings():
     return db_settings if isinstance(db_settings, dict) else {}
 
 
+def get_client_startup_context():
+    db_settings = _load_db_settings()
+    host = os.getenv("DB_HOST") or db_settings.get("host")
+    port = os.getenv("DB_PORT") or db_settings.get("port")
+    dbname = os.getenv("DB_NAME") or db_settings.get("name")
+    env_source = _loaded_env_path if _loaded_env_path and os.path.exists(_loaded_env_path) else "none"
+    return {
+        "env": _env,
+        "db_host": host or "",
+        "db_port": str(port or ""),
+        "db_name": dbname or "",
+        "env_source": env_source,
+    }
+
+
 def _save_app_settings(settings):
     try:
         with open(_APP_SETTINGS_PATH, "w", encoding="utf-8") as handle:
@@ -219,77 +234,9 @@ def _connect(host, port, dbname, user, password, sslmode):
 
 
 def _ensure_connection():
-    global _conn
-    if _conn is not None and not _conn.closed:
-        return _conn
-
-    if is_api_configured():
-        raise RuntimeError("Local DB access is disabled while API mode is configured.")
-
-    db_settings = _load_db_settings()
-    host = os.getenv("DB_HOST") or db_settings.get("host")
-    port = os.getenv("DB_PORT") or db_settings.get("port")
-    dbname = os.getenv("DB_NAME") or db_settings.get("name")
-    sslmode = os.getenv("DB_SSLMODE") or db_settings.get("sslmode")
-
-    host = _require(host, "host", "Set DB_HOST or app_settings.json db.host")
-    dbname = _require(dbname, "name", "Set DB_NAME or app_settings.json db.name")
-    port = _require(port, "port", "Set DB_PORT or app_settings.json db.port")
-
-    env_user = os.getenv("DB_USER")
-    env_password = os.getenv("DB_PASSWORD")
-    user = env_user or _get_keyring_user()
-    password = env_password or _get_keyring_password(env_user or user)
-
-    if not user or not password:
-        user, password = _prompt_for_credentials(default_user=user)
-        _save_keyring_credentials(user, password)
-
-    try:
-        conn = _connect(host, port, dbname, user, password, sslmode)
-    except OperationalError as exc:
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes("-topmost", True)
-        should_edit = messagebox.askyesno(
-            "Database Connection Failed",
-            "Database connection failed.\n\nDo you want to edit the DB settings?",
-            parent=root,
-        )
-        root.destroy()
-        if should_edit:
-            new_db_settings = _prompt_for_db_settings(db_settings or {})
-            settings = _load_app_settings()
-            settings["db"] = new_db_settings
-            _save_app_settings(settings)
-            host = new_db_settings.get("host")
-            port = new_db_settings.get("port")
-            dbname = new_db_settings.get("name")
-            sslmode = new_db_settings.get("sslmode")
-            try:
-                conn = _connect(host, port, dbname, user, password, sslmode)
-            except OperationalError as exc2:
-                messagebox.showerror(
-                    "Database Connection Failed",
-                    "Unable to connect to the database.\n\n"
-                    f"{exc2}\n\n"
-                    "Tip: If you see 'no pg_hba.conf entry ... no encryption', "
-                    "set sslmode to 'require' or update pg_hba.conf.",
-                )
-                sys.exit(1)
-        else:
-            messagebox.showerror(
-                "Database Connection Failed",
-                "Unable to connect to the database.\n\n"
-                f"{exc}\n\n"
-                "Tip: If you see 'no pg_hba.conf entry ... no encryption', "
-                "set sslmode to 'require' or update pg_hba.conf.",
-            )
-            sys.exit(1)
-
-    conn.autocommit = True
-    _conn = conn
-    return _conn
+    raise RuntimeError(
+        "Direct DB access is disabled in API-only mode. Use backend API endpoints instead."
+    )
 
 
 def execute(query, params=None):

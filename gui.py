@@ -3,26 +3,55 @@ import os
 import re
 import subprocess
 import sys
+import time
 import tkinter as tk
 import traceback
 from tkinter import messagebox, ttk
 
 from api_client import ApiError, clear_session_credentials, is_api_configured, login_with_credentials
+from db import get_client_startup_context
 from version import __version__
 from i18n import init_i18n, t
 from ui import about, attendance, locations, news_notifications, reports, sessions, settings, students, teachers, users
 
 
+_THINKING_SPINNER = ("⠇", "⠙", "⠸", "⠴", "⠦", "⠓")
+
+
 def _run_pre_login_tests() -> bool:
     print("\n=== PRE-TEST START ===")
     print("Running test suite before login screen...")
+    print("+--------------------------------------------------------------+")
+    print("| Test Status                                                  |")
+    print("+--------------------------------------------------------------+")
     try:
-        result = subprocess.run(
+        process = subprocess.Popen(
             [sys.executable, "-m", "pytest", "-rA", "-vv"],
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             cwd=os.path.dirname(os.path.abspath(__file__)),
-            check=False,
+        )
+        start_ts = time.time()
+        frame_idx = 0
+        while process.poll() is None:
+            frame = _THINKING_SPINNER[frame_idx % len(_THINKING_SPINNER)]
+            elapsed = time.time() - start_ts
+            status = (
+                f"| Thinking {frame}  Running pre-login tests"
+                f"  ({elapsed:05.1f}s)           |"
+            )
+            print(f"\r{status}", end="", flush=True)
+            frame_idx += 1
+            time.sleep(0.12)
+        stdout, stderr = process.communicate()
+        print("\r| Test run complete. Collecting results...                     |")
+        print("+--------------------------------------------------------------+")
+        result = subprocess.CompletedProcess(
+            args=process.args,
+            returncode=process.returncode,
+            stdout=stdout,
+            stderr=stderr,
         )
     except Exception as exc:
         print(f"❌ Pre-test execution error: {exc}")
@@ -205,23 +234,37 @@ def main():
         ],
         force=True,
     )
-    logging.error("TEST ERROR: console logging works")
-    
+    startup_ctx = get_client_startup_context()
+    print(
+        f"[client] startup env={startup_ctx['env']} "
+        f"db={startup_ctx['db_name']}@{startup_ctx['db_host']}:{startup_ctx['db_port']} "
+        f"env_file={startup_ctx['env_source']}"
+    )
 
     try:
-        _run_pre_login_tests()
         init_i18n()
         root = tk.Tk()
         root.withdraw()
         root.title(t("app.title"))
         root.geometry("1400x850")
 
-        current_user = None
-        if is_api_configured():
-            current_user = _require_api_login(root)
-            if not current_user:
-                root.destroy()
-                return
+        if not is_api_configured():
+            messagebox.showerror(
+                t("alert.api_required_title"),
+                t("alert.api_required_message"),
+                parent=root,
+            )
+            root.destroy()
+            return
+
+        pretests_ok = _run_pre_login_tests()
+        if not pretests_ok:
+            print("[client] pre-login tests failed; continuing startup.")
+
+        current_user = _require_api_login(root)
+        if not current_user:
+            root.destroy()
+            return
 
         notebook = ttk.Notebook(root)
         notebook.pack(fill=tk.BOTH, expand=True)
@@ -260,15 +303,14 @@ def main():
                 if role == "admin":
                     notebook.tab(tab_users, state="normal")
 
-        if is_api_configured():
-            def _logout_and_relogin():
-                clear_session_credentials()
-                root.destroy()
-                _restart_application()
-                raise SystemExit(0)
+        def _logout_and_relogin():
+            clear_session_credentials()
+            root.destroy()
+            _restart_application()
+            raise SystemExit(0)
 
-            logout_btn = ttk.Button(root, text=t("button.logout"), command=_logout_and_relogin)
-            logout_btn.place(relx=1.0, x=-12, y=10, anchor="ne")
+        logout_btn = ttk.Button(root, text=t("button.logout"), command=_logout_and_relogin)
+        logout_btn.place(relx=1.0, x=-12, y=10, anchor="ne")
 
         _apply_user_ui_state()
 
@@ -302,8 +344,8 @@ def main():
         logging.error("APP STARTUP ERROR\n%s", traceback.format_exc())
         try:
             messagebox.showerror(
-                "Startup error",
-                "The app failed to start. Check app.log for details."
+                t("alert.startup_error_title"),
+                t("alert.startup_error_message")
             )
         except Exception:
             pass

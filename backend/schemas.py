@@ -3,7 +3,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-UserRole = Literal["admin", "teacher", "readonly"]
+UserRole = Literal["admin", "coach", "receptionist"]
 
 
 class LoginRequest(BaseModel):
@@ -22,12 +22,14 @@ class TokenResponse(BaseModel):
 class ApiUserCreateIn(BaseModel):
     username: str = Field(min_length=3, max_length=60)
     password: str = Field(min_length=10, max_length=256)
-    role: UserRole = "teacher"
+    role: UserRole = "coach"
 
 
 class ApiUserUpdateIn(BaseModel):
+    username: Optional[str] = Field(default=None, min_length=3, max_length=60)
     role: Optional[UserRole] = None
     active: Optional[bool] = None
+    new_password: Optional[str] = Field(default=None, min_length=10, max_length=256)
 
 
 class ApiUserPasswordResetIn(BaseModel):

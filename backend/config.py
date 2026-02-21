@@ -8,13 +8,25 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).resolve().parent.parent
 BACKEND_DIR = Path(__file__).resolve().parent
 APP_SETTINGS_PATH = ROOT_DIR / "app_settings.json"
+APP_ENV = os.getenv("APP_ENV", "dev").strip().lower()
 
 # Backend-specific env files have priority for API credentials/settings.
 # Root-level env files are kept as fallback for compatibility.
-load_dotenv(BACKEND_DIR / ".env", override=False)
-load_dotenv(BACKEND_DIR / ".env.dev", override=False)
-load_dotenv(ROOT_DIR / ".env", override=False)
-load_dotenv(ROOT_DIR / ".env.dev", override=False)
+_env_variant = {
+    "dev": ".env.dev",
+    "prod": ".env.prod",
+    "cloud": ".env.cloud",
+}.get(APP_ENV, ".env")
+ENV_FILE_PRIORITY = [
+    ROOT_DIR / ".env",
+    ROOT_DIR / _env_variant,
+    BACKEND_DIR / ".env",
+    BACKEND_DIR / _env_variant,
+]
+for env_file in ENV_FILE_PRIORITY:
+    # API runs in project-scoped mode: env files should override machine/user env vars.
+    load_dotenv(env_file, override=True)
+ENV_FILES_PRESENT = [str(path) for path in ENV_FILE_PRIORITY if path.exists()]
 
 
 def _load_json(path: Path) -> dict:

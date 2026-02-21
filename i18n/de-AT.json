@@ -173,9 +173,13 @@
   "label.created_at": "Erstellt am",
   "label.password": "Passwort",
   "alert.api_error_title": "API-Fehler",
+  "alert.api_required_title": "API erforderlich",
+  "alert.api_required_message": "Dieser Client laeuft nur im API-Modus. Konfiguriere api.base_url in app_settings.json.",
+  "alert.startup_error_title": "Startfehler",
+  "alert.startup_error_message": "Die App konnte nicht gestartet werden. Pruefe app.log fuer Details.",
   "alert.validation_title": "Validierungsfehler",
   "alert.select_user": "Bitte zuerst einen Benutzer auswaehlen.",
   "alert.username_min": "Benutzername muss mindestens 3 Zeichen haben.",
   "alert.password_min": "Passwort muss mindestens 10 Zeichen haben.",
-  "alert.invalid_role": "Rolle muss eine von diesen sein: admin, teacher, readonly."
+  "alert.invalid_role": "Rolle muss eine von diesen sein: admin, coach, receptionist."
 }
