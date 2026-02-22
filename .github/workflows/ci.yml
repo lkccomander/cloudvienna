@@ -3,8 +3,9 @@ name: CI - BJJ Desktop
 on:
   push:
     branches:
-      - main
+      - "**"
   pull_request:
+  workflow_dispatch:
 
 jobs:
   ci:
@@ -42,6 +43,5 @@ jobs:
           path: dist/*.exe
 
       
-
 
 
