@@ -1,6 +1,5 @@
 import argparse
 import json
-import sys
 
 from api_client import ApiError, batch_create_api_users
 

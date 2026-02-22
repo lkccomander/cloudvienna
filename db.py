@@ -5,10 +5,8 @@ import sys
 import keyring
 import psycopg2
 import tkinter as tk
-from api_client import is_api_configured
 from tkinter import messagebox, simpledialog
 from dotenv import load_dotenv
-from psycopg2 import OperationalError
 
 _env = os.getenv("APP_ENV", "default").lower()
 _base_dir = os.path.dirname(os.path.abspath(__file__))
