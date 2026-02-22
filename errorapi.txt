@@ -1,3 +1,4 @@
+Run ruff check .
 F401 [*] `sys` imported but unused
  --> batch_create_users.py:3:8
   |

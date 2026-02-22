@@ -7,8 +7,6 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from api_client import ApiError, batch_create_api_users
-
 
 def _load_json(path: str):
     with open(path, "r", encoding="utf-8-sig") as handle:
@@ -52,6 +50,8 @@ def _normalize_users(items: list[dict], default_role: str, default_password: str
 
 
 def main() -> int:
+    from api_client import ApiError, batch_create_api_users
+
     parser = argparse.ArgumentParser(description="Batch create API users from JSON file")
     parser.add_argument("--file", required=True, help="Path to JSON file with users")
     parser.add_argument(

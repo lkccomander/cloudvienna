@@ -7,8 +7,6 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from api_client import ApiError, batch_create_students
-
 
 def _load_students(path: str) -> list[dict]:
     with open(path, "r", encoding="utf-8-sig") as handle:
@@ -21,6 +19,8 @@ def _load_students(path: str) -> list[dict]:
 
 
 def main() -> int:
+    from api_client import ApiError, batch_create_students
+
     parser = argparse.ArgumentParser(description="Batch create students from JSON file")
     parser.add_argument("--file", required=True, help="Path to JSON file")
     parser.add_argument(
