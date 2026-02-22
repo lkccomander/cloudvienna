@@ -12,6 +12,9 @@ from backend.db import execute, execute_returning_one, fetch_all, fetch_one
 from backend.schemas import (
     ApiUserPasswordResetIn,
     ApiUserUpdateIn,
+    ApiUserBatchCreateIn,
+    ApiUserBatchCreateOut,
+    ApiUserBatchCreateResult,
     ApiUserCreateIn,
     ApiUserOut,
     AttendanceRegisterIn,
@@ -533,6 +536,86 @@ def create_user(payload: ApiUserCreateIn, _: str = Depends(_require_admin)):
         (username, hash_password(payload.password), payload.role),
     )
     return ApiUserOut.model_validate(row)
+
+
+@app.post("/users/batch-create", response_model=ApiUserBatchCreateOut)
+def batch_create_users(payload: ApiUserBatchCreateIn, _: str = Depends(_require_admin)):
+    raw_usernames = [item.username.strip() for item in payload.users]
+    existing_rows = fetch_all(
+        """
+        SELECT username
+        FROM t_api_users
+        WHERE username = ANY(%s)
+        """,
+        (raw_usernames,),
+    )
+    existing = {str(row["username"]) for row in existing_rows}
+    seen: set[str] = set()
+
+    results: list[ApiUserBatchCreateResult] = []
+    created = 0
+    skipped = 0
+    errors = 0
+
+    for item in payload.users:
+        username = item.username.strip()
+        if username in seen:
+            skipped += 1
+            results.append(
+                ApiUserBatchCreateResult(
+                    username=username,
+                    status="skipped",
+                    detail="Duplicate username in payload",
+                )
+            )
+            continue
+        seen.add(username)
+
+        if username in existing:
+            skipped += 1
+            results.append(
+                ApiUserBatchCreateResult(
+                    username=username,
+                    status="skipped",
+                    detail="Username already exists",
+                )
+            )
+            continue
+
+        try:
+            row = execute_returning_one(
+                """
+                INSERT INTO t_api_users (username, password_hash, role, active)
+                VALUES (%s, %s, %s, TRUE)
+                RETURNING id
+                """,
+                (username, hash_password(item.password), item.role),
+            )
+            created += 1
+            results.append(
+                ApiUserBatchCreateResult(
+                    username=username,
+                    status="created",
+                    id=int(row["id"]),
+                )
+            )
+        except Exception:
+            errors += 1
+            results.append(
+                ApiUserBatchCreateResult(
+                    username=username,
+                    status="error",
+                    detail="Insert failed",
+                )
+            )
+
+    return ApiUserBatchCreateOut(
+        total=len(payload.users),
+        created=created,
+        skipped=skipped,
+        errors=errors,
+        results=results,
+    )
 
 
 @app.put("/users/{user_id}", response_model=ApiUserOut)

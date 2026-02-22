@@ -46,6 +46,25 @@ class ApiUserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ApiUserBatchCreateIn(BaseModel):
+    users: list[ApiUserCreateIn] = Field(min_length=1, max_length=500)
+
+
+class ApiUserBatchCreateResult(BaseModel):
+    username: str
+    status: Literal["created", "skipped", "error"]
+    detail: Optional[str] = None
+    id: Optional[int] = None
+
+
+class ApiUserBatchCreateOut(BaseModel):
+    total: int
+    created: int
+    skipped: int
+    errors: int
+    results: list[ApiUserBatchCreateResult]
+
+
 class AuthUserOut(BaseModel):
     id: int
     username: str

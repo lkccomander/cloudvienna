@@ -3,6 +3,7 @@ from datetime import date, timedelta
 
 from pydantic import ValidationError as PydanticValidationError
 from backend.schemas import (
+    ApiUserBatchCreateIn,
     ApiUserCreateIn,
     ReportsStudentSearchIn,
     StudentCreateRequest,
@@ -127,6 +128,22 @@ def test_api_reports_student_search_offset_negative():
 def test_api_user_create_rejects_short_password():
     with pytest.raises(PydanticValidationError):
         ApiUserCreateIn(username="coach1", password="short", role="coach")
+
+
+def test_api_user_batch_create_accepts_valid_payload():
+    payload = ApiUserBatchCreateIn(
+        users=[
+            {"username": "coach1", "password": "StrongPwd123", "role": "coach"},
+            {"username": "reception1", "password": "StrongPwd456", "role": "receptionist"},
+        ]
+    )
+
+    assert len(payload.users) == 2
+
+
+def test_api_user_batch_create_requires_non_empty_list():
+    with pytest.raises(PydanticValidationError):
+        ApiUserBatchCreateIn(users=[])
 
 
 def test_api_user_preferences_accept_valid_payload():

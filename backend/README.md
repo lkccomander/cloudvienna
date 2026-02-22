@@ -8,6 +8,7 @@ This is the first backend scaffold to remove direct DB access from the GUI clien
 - `POST /auth/login`
 - `GET /users/list` (admin)
 - `POST /users/create` (admin)
+- `POST /users/batch-create` (admin)
 - `GET /students/list`
 - `GET /students/count`
 - `GET /students/{id}`

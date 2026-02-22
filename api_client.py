@@ -350,6 +350,10 @@ def create_api_user(payload):
     return _with_auth_request("POST", "/users/create", payload=payload)
 
 
+def batch_create_api_users(payload):
+    return _with_auth_request("POST", "/users/batch-create", payload=payload)
+
+
 def update_api_user(user_id, payload):
     return _with_auth_request("PUT", f"/users/{int(user_id)}", payload=payload)
 
