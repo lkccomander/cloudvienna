@@ -1,0 +1,100 @@
+
+DB config loaded from: C:\Projects\cloudvienna\.env
+[client] startup env=default db=cloudvienna@localhost:5432 env_file=none
+
+=== PRE-TEST START ===
+Running test suite before login screen...
++--------------------------------------------------------------+
+| Test Status                                                  |
++--------------------------------------------------------------+
+| Test run complete. Collecting results...                     |
++--------------------------------------------------------------+
+============================= test session starts =============================
+platform win32 -- Python 3.14.2, pytest-9.0.2, pluggy-1.6.0 -- C:\Projects\cloudvienna\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Projects\cloudvienna
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.12.1
+collecting ... collected 23 items
+
+tests/test_api_health.py::test_api_health_endpoint PASSED                [  4%]
+tests/test_validation.py::test_validate_required_ok PASSED               [  8%]
+tests/test_validation.py::test_validate_required_empty PASSED            [ 13%]
+tests/test_validation.py::test_validate_email_ok PASSED                  [ 17%]
+tests/test_validation.py::test_validate_email_invalid PASSED             [ 21%]
+tests/test_validation.py::test_validate_weight_ok PASSED                 [ 26%]
+tests/test_validation.py::test_validate_weight_invalid PASSED            [ 30%]
+tests/test_validation.py::test_validate_birthday_ok PASSED               [ 34%]
+tests/test_validation.py::test_validate_birthday_future PASSED           [ 39%]
+tests/test_validation.py::test_full_student_registration_valid PASSED    [ 43%]
+tests/test_validation.py::test_api_student_create_request_defaults PASSED [ 47%]
+tests/test_validation.py::test_api_student_create_request_requires_name PASSED [ 52%]
+tests/test_validation.py::test_api_student_batch_create_accepts_valid_payload PASSED [ 56%]
+tests/test_validation.py::test_api_student_batch_create_requires_non_empty_list PASSED [ 60%]
+tests/test_validation.py::test_api_reports_student_search_defaults PASSED [ 65%]
+tests/test_validation.py::test_api_reports_student_search_limit_too_high PASSED [ 69%]
+tests/test_validation.py::test_api_reports_student_search_offset_negative PASSED [ 73%]
+tests/test_validation.py::test_api_user_create_rejects_short_password PASSED [ 78%]
+tests/test_validation.py::test_api_user_batch_create_accepts_valid_payload PASSED [ 82%]
+tests/test_validation.py::test_api_user_batch_create_requires_non_empty_list PASSED [ 86%]
+tests/test_validation.py::test_api_user_preferences_accept_valid_payload PASSED [ 91%]
+tests/test_validation.py::test_api_user_preferences_reject_invalid_theme PASSED [ 95%]
+tests/test_validation.py::test_api_user_preferences_reject_short_language PASSED [100%]
+
+=================================== PASSES ====================================
+__________________________ test_api_health_endpoint ___________________________
+---------------------------- Captured stdout call -----------------------------
+-\u2705
+=========================== short test summary info ===========================
+PASSED tests/test_api_health.py::test_api_health_endpoint
+PASSED tests/test_validation.py::test_validate_required_ok
+PASSED tests/test_validation.py::test_validate_required_empty
+PASSED tests/test_validation.py::test_validate_email_ok
+PASSED tests/test_validation.py::test_validate_email_invalid
+PASSED tests/test_validation.py::test_validate_weight_ok
+PASSED tests/test_validation.py::test_validate_weight_invalid
+PASSED tests/test_validation.py::test_validate_birthday_ok
+PASSED tests/test_validation.py::test_validate_birthday_future
+PASSED tests/test_validation.py::test_full_student_registration_valid
+PASSED tests/test_validation.py::test_api_student_create_request_defaults
+PASSED tests/test_validation.py::test_api_student_create_request_requires_name
+PASSED tests/test_validation.py::test_api_student_batch_create_accepts_valid_payload
+PASSED tests/test_validation.py::test_api_student_batch_create_requires_non_empty_list
+PASSED tests/test_validation.py::test_api_reports_student_search_defaults
+PASSED tests/test_validation.py::test_api_reports_student_search_limit_too_high
+PASSED tests/test_validation.py::test_api_reports_student_search_offset_negative
+PASSED tests/test_validation.py::test_api_user_create_rejects_short_password
+PASSED tests/test_validation.py::test_api_user_batch_create_accepts_valid_payload
+PASSED tests/test_validation.py::test_api_user_batch_create_requires_non_empty_list
+PASSED tests/test_validation.py::test_api_user_preferences_accept_valid_payload
+PASSED tests/test_validation.py::test_api_user_preferences_reject_invalid_theme
+PASSED tests/test_validation.py::test_api_user_preferences_reject_short_language
+============================= 23 passed in 0.59s ==============================
+
+Per-test results:
+✅ tests/test_api_health.py::test_api_health_endpoint [PASSED]
+✅ tests/test_validation.py::test_validate_required_ok [PASSED]
+✅ tests/test_validation.py::test_validate_required_empty [PASSED]
+✅ tests/test_validation.py::test_validate_email_ok [PASSED]
+✅ tests/test_validation.py::test_validate_email_invalid [PASSED]
+✅ tests/test_validation.py::test_validate_weight_ok [PASSED]
+✅ tests/test_validation.py::test_validate_weight_invalid [PASSED]
+✅ tests/test_validation.py::test_validate_birthday_ok [PASSED]
+✅ tests/test_validation.py::test_validate_birthday_future [PASSED]
+✅ tests/test_validation.py::test_full_student_registration_valid [PASSED]
+✅ tests/test_validation.py::test_api_student_create_request_defaults [PASSED]
+✅ tests/test_validation.py::test_api_student_create_request_requires_name [PASSED]
+✅ tests/test_validation.py::test_api_student_batch_create_accepts_valid_payload [PASSED]
+✅ tests/test_validation.py::test_api_student_batch_create_requires_non_empty_list [PASSED]
+✅ tests/test_validation.py::test_api_reports_student_search_defaults [PASSED]
+✅ tests/test_validation.py::test_api_reports_student_search_limit_too_high [PASSED]
+✅ tests/test_validation.py::test_api_reports_student_search_offset_negative [PASSED]
+✅ tests/test_validation.py::test_api_user_create_rejects_short_password [PASSED]
+✅ tests/test_validation.py::test_api_user_batch_create_accepts_valid_payload [PASSED]
+✅ tests/test_validation.py::test_api_user_batch_create_requires_non_empty_list [PASSED]
+✅ tests/test_validation.py::test_api_user_preferences_accept_valid_payload [PASSED]
+✅ tests/test_validation.py::test_api_user_preferences_reject_invalid_theme [PASSED]
+✅ tests/test_validation.py::test_api_user_preferences_reject_short_language [PASSED]
+✅ Pre-test passed
+=== PRE-TEST END ===

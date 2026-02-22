@@ -210,6 +210,11 @@ def create_student(payload):
     return _with_auth_request("POST", "/students/create", payload=payload)
 
 
+def batch_create_students(payload, dry_run=False):
+    suffix = "?dry_run=true" if dry_run else ""
+    return _with_auth_request("POST", f"/students/batch-create{suffix}", payload=payload)
+
+
 def get_student(student_id):
     return _with_auth_request("GET", f"/students/{int(student_id)}")
 
@@ -350,8 +355,9 @@ def create_api_user(payload):
     return _with_auth_request("POST", "/users/create", payload=payload)
 
 
-def batch_create_api_users(payload):
-    return _with_auth_request("POST", "/users/batch-create", payload=payload)
+def batch_create_api_users(payload, dry_run=False):
+    suffix = "?dry_run=true" if dry_run else ""
+    return _with_auth_request("POST", f"/users/batch-create{suffix}", payload=payload)
 
 
 def update_api_user(user_id, payload):

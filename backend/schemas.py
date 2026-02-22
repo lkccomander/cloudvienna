@@ -52,12 +52,13 @@ class ApiUserBatchCreateIn(BaseModel):
 
 class ApiUserBatchCreateResult(BaseModel):
     username: str
-    status: Literal["created", "skipped", "error"]
+    status: Literal["created", "skipped", "error", "would_create"]
     detail: Optional[str] = None
     id: Optional[int] = None
 
 
 class ApiUserBatchCreateOut(BaseModel):
+    dry_run: bool = False
     total: int
     created: int
     skipped: int
@@ -113,6 +114,26 @@ class StudentCreateRequest(BaseModel):
 
 class StudentUpdateRequest(StudentCreateRequest):
     pass
+
+
+class StudentBatchCreateIn(BaseModel):
+    students: list[StudentCreateRequest] = Field(min_length=1, max_length=1000)
+
+
+class StudentBatchCreateResult(BaseModel):
+    name: str
+    email: str
+    status: Literal["created", "error", "would_create"]
+    id: Optional[int] = None
+    detail: Optional[str] = None
+
+
+class StudentBatchCreateOut(BaseModel):
+    dry_run: bool = False
+    total: int
+    created: int
+    errors: int
+    results: list[StudentBatchCreateResult]
 
 
 class StudentCreateResponse(BaseModel):
