@@ -1,5 +1,11 @@
 import argparse
 import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from api_client import ApiError, batch_create_api_users
 
@@ -7,8 +13,10 @@ from api_client import ApiError, batch_create_api_users
 def _load_json(path: str):
     with open(path, "r", encoding="utf-8-sig") as handle:
         data = json.load(handle)
+    if isinstance(data, dict):
+        data = data.get("users", [])
     if not isinstance(data, list):
-        raise ValueError("Input JSON must be a list of objects.")
+        raise ValueError("Input JSON must be a list or an object with key 'users'.")
     return data
 
 
