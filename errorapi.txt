@@ -1,40 +1,219 @@
-Run ruff check .
-F401 [*] `sys` imported but unused
- --> batch_create_users.py:3:8
-  |
-1 | import argparse
-2 | import json
-3 | import sys
-  |        ^^^
-4 |
-5 | from api_client import ApiError, batch_create_api_users
-  |
-help: Remove unused import: `sys`
+Run pytest tests
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.0.2, pluggy-1.6.0
+rootdir: D:\a\cloudvienna\cloudvienna
+configfile: pyproject.toml
+plugins: anyio-4.12.1
+collected 25 items
 
-F401 [*] `api_client.is_api_configured` imported but unused
-  --> db.py:8:24
-   |
- 6 | import psycopg2
- 7 | import tkinter as tk
- 8 | from api_client import is_api_configured
-   |                        ^^^^^^^^^^^^^^^^^
- 9 | from tkinter import messagebox, simpledialog
-10 | from dotenv import load_dotenv
-   |
-help: Remove unused import: `api_client.is_api_configured`
+tests\test_api_health.py F                                               [  4%]
+tests\test_validation.py ........................                        [100%]
 
-F401 [*] `psycopg2.OperationalError` imported but unused
-  --> db.py:11:22
-   |
- 9 | from tkinter import messagebox, simpledialog
-10 | from dotenv import load_dotenv
-11 | from psycopg2 import OperationalError
-   |                      ^^^^^^^^^^^^^^^^
-12 |
-13 | _env = os.getenv("APP_ENV", "default").lower()
-   |
-help: Remove unused import: `psycopg2.OperationalError`
+================================== FAILURES ===================================
+__________________________ test_api_health_endpoint ___________________________
 
-Found 3 errors.
-[*] 3 fixable with the `--fix` option.
-Error: Process completed with exit code 1.
+self = <urllib.request.HTTPHandler object at 0x000001C4C3E29150>
+http_class = <class 'http.client.HTTPConnection'>
+req = <urllib.request.Request object at 0x000001C4C3E56F90>, http_conn_args = {}
+host = '127.0.0.1:8000'
+h = <http.client.HTTPConnection object at 0x000001C4C3E54910>
+
+    def do_open(self, http_class, req, **http_conn_args):
+        """Return an HTTPResponse object for the request, using http_class.
+    
+        http_class must implement the HTTPConnection API from http.client.
+        """
+        host = req.host
+        if not host:
+            raise URLError('no host given')
+    
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+        h.set_debuglevel(self._debuglevel)
+    
+        headers = dict(req.unredirected_hdrs)
+        headers.update({k: v for k, v in req.headers.items()
+                        if k not in headers})
+    
+        # TODO(jhylton): Should this be redesigned to handle
+        # persistent connections?
+    
+        # We want to make an HTTP/1.1 request, but the addinfourl
+        # class isn't prepared to deal with a persistent connection.
+        # It will try to read all remaining data from the socket,
+        # which will block while the server waits for the next request.
+        # So make sure the connection gets closed after the (only)
+        # request.
+        headers["Connection"] = "close"
+        headers = {name.title(): val for name, val in headers.items()}
+    
+        if req._tunnel_host:
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h.set_tunnel(req._tunnel_host, headers=tunnel_headers)
+    
+        try:
+            try:
+>               h.request(req.get_method(), req.selector, req.data, headers,
+                          encode_chunked=req.has_header('Transfer-encoding'))
+
+C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\urllib\request.py:1348: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\http\client.py:1303: in request
+    self._send_request(method, url, body, headers, encode_chunked)
+C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\http\client.py:1349: in _send_request
+    self.endheaders(body, encode_chunked=encode_chunked)
+C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\http\client.py:1298: in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\http\client.py:1058: in _send_output
+    self.send(msg)
+C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\http\client.py:996: in send
+    self.connect()
+C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\http\client.py:962: in connect
+    self.sock = self._create_connection(
+C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\socket.py:851: in create_connection
+    raise exceptions[0]
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+address = ('127.0.0.1', 8000), timeout = 5, source_address = None
+
+    def create_connection(address, timeout=_GLOBAL_DEFAULT_TIMEOUT,
+                          source_address=None, *, all_errors=False):
+        """Connect to *address* and return the socket object.
+    
+        Convenience function.  Connect to *address* (a 2-tuple ``(host,
+        port)``) and return the socket object.  Passing the optional
+        *timeout* parameter will set the timeout on the socket instance
+        before attempting to connect.  If no *timeout* is supplied, the
+        global default timeout setting returned by :func:`getdefaulttimeout`
+        is used.  If *source_address* is set it must be a tuple of (host, port)
+        for the socket to bind as a source address before making the connection.
+        A host of '' or port 0 tells the OS to use the default. When a connection
+        cannot be created, raises the last error if *all_errors* is False,
+        and an ExceptionGroup of all errors if *all_errors* is True.
+        """
+    
+        host, port = address
+        exceptions = []
+        for res in getaddrinfo(host, port, 0, SOCK_STREAM):
+            af, socktype, proto, canonname, sa = res
+            sock = None
+            try:
+                sock = socket(af, socktype, proto)
+                if timeout is not _GLOBAL_DEFAULT_TIMEOUT:
+                    sock.settimeout(timeout)
+                if source_address:
+                    sock.bind(source_address)
+>               sock.connect(sa)
+E               ConnectionRefusedError: [WinError 10061] No connection could be made because the target machine actively refused it
+
+C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\socket.py:836: ConnectionRefusedError
+
+During handling of the above exception, another exception occurred:
+
+    def test_api_health_endpoint():
+        base_url = (os.getenv("API_BASE_URL") or "http://127.0.0.1:8000").rstrip("/")
+        url = f"{base_url}/health"
+    
+        try:
+>           with urllib.request.urlopen(url, timeout=5) as response:
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_api_health.py:14: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\urllib\request.py:216: in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\urllib\request.py:519: in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\urllib\request.py:536: in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\urllib\request.py:496: in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\urllib\request.py:1377: in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <urllib.request.HTTPHandler object at 0x000001C4C3E29150>
+http_class = <class 'http.client.HTTPConnection'>
+req = <urllib.request.Request object at 0x000001C4C3E56F90>, http_conn_args = {}
+host = '127.0.0.1:8000'
+h = <http.client.HTTPConnection object at 0x000001C4C3E54910>
+
+    def do_open(self, http_class, req, **http_conn_args):
+        """Return an HTTPResponse object for the request, using http_class.
+    
+        http_class must implement the HTTPConnection API from http.client.
+        """
+        host = req.host
+        if not host:
+            raise URLError('no host given')
+    
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+        h.set_debuglevel(self._debuglevel)
+    
+        headers = dict(req.unredirected_hdrs)
+        headers.update({k: v for k, v in req.headers.items()
+                        if k not in headers})
+    
+        # TODO(jhylton): Should this be redesigned to handle
+        # persistent connections?
+    
+        # We want to make an HTTP/1.1 request, but the addinfourl
+        # class isn't prepared to deal with a persistent connection.
+        # It will try to read all remaining data from the socket,
+        # which will block while the server waits for the next request.
+        # So make sure the connection gets closed after the (only)
+        # request.
+        headers["Connection"] = "close"
+        headers = {name.title(): val for name, val in headers.items()}
+    
+        if req._tunnel_host:
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h.set_tunnel(req._tunnel_host, headers=tunnel_headers)
+    
+        try:
+            try:
+                h.request(req.get_method(), req.selector, req.data, headers,
+                          encode_chunked=req.has_header('Transfer-encoding'))
+            except OSError as err: # timeout error
+>               raise URLError(err)
+E               urllib.error.URLError: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>
+
+C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\urllib\request.py:1351: URLError
+
+During handling of the above exception, another exception occurred:
+
+    def test_api_health_endpoint():
+        base_url = (os.getenv("API_BASE_URL") or "http://127.0.0.1:8000").rstrip("/")
+        url = f"{base_url}/health"
+    
+        try:
+            with urllib.request.urlopen(url, timeout=5) as response:
+                body = response.read().decode("utf-8")
+                data = json.loads(body) if body else {}
+                assert response.status == 200
+                assert data.get("status") == "ok"
+        except urllib.error.URLError as exc:
+>           pytest.fail(f"API health check failed for {url}: {exc.reason}")
+E           Failed: API health check failed for http://127.0.0.1:8000/health: [WinError 10061] No connection could be made because the target machine actively refused it
+
+tests\test_api_health.py:20: Failed
+=========================== short test summary info ===========================
+FAILED tests/test_api_health.py::test_api_health_endpoint - Failed: API health check failed for http://127.0.0.1:8000/health: [WinError 10061] No connection could be made because the target machine actively refused it
+======================== 1 failed, 24 passed in 2.54s =========================
