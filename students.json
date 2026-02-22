@@ -1,4 +1,5 @@
-[
+{
+  "students": [
   {
     "name": "Lukas Steiner",
     "sex": "M",
@@ -660,3 +661,5 @@
     "guardian_relationship": "Mother"
   }
 ]
+
+}

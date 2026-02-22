@@ -13,6 +13,7 @@ This is the first backend scaffold to remove direct DB access from the GUI clien
 - `GET /students/count`
 - `GET /students/{id}`
 - `POST /students/create`
+- `POST /students/batch-create`
 - `PUT /students/{id}`
 - `POST /students/{id}/deactivate`
 - `POST /students/{id}/reactivate`
@@ -44,6 +45,10 @@ This is the first backend scaffold to remove direct DB access from the GUI clien
 - `GET /attendance/by-student/{id}`
 - `POST /reports/students/search`
 - `POST /reports/students/export`
+
+Batch endpoints support dry run:
+- `POST /users/batch-create?dry_run=true`
+- `POST /students/batch-create?dry_run=true`
 
 ## Environment variables
 

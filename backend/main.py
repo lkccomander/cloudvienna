@@ -40,6 +40,9 @@ from backend.schemas import (
     TeacherIn,
     TeacherOut,
     StudentCreateRequest,
+    StudentBatchCreateIn,
+    StudentBatchCreateOut,
+    StudentBatchCreateResult,
     StudentCreateResponse,
     StudentDetailOut,
     StudentOut,
@@ -539,7 +542,11 @@ def create_user(payload: ApiUserCreateIn, _: str = Depends(_require_admin)):
 
 
 @app.post("/users/batch-create", response_model=ApiUserBatchCreateOut)
-def batch_create_users(payload: ApiUserBatchCreateIn, _: str = Depends(_require_admin)):
+def batch_create_users(
+    payload: ApiUserBatchCreateIn,
+    _: str = Depends(_require_admin),
+    dry_run: bool = Query(default=False),
+):
     raw_usernames = [item.username.strip() for item in payload.users]
     existing_rows = fetch_all(
         """
@@ -583,20 +590,24 @@ def batch_create_users(payload: ApiUserBatchCreateIn, _: str = Depends(_require_
             continue
 
         try:
-            row = execute_returning_one(
-                """
-                INSERT INTO t_api_users (username, password_hash, role, active)
-                VALUES (%s, %s, %s, TRUE)
-                RETURNING id
-                """,
-                (username, hash_password(item.password), item.role),
-            )
+            if dry_run:
+                row = {"id": None}
+            else:
+                row = execute_returning_one(
+                    """
+                    INSERT INTO t_api_users (username, password_hash, role, active)
+                    VALUES (%s, %s, %s, TRUE)
+                    RETURNING id
+                    """,
+                    (username, hash_password(item.password), item.role),
+                )
             created += 1
             results.append(
                 ApiUserBatchCreateResult(
                     username=username,
-                    status="created",
-                    id=int(row["id"]),
+                    status="would_create" if dry_run else "created",
+                    id=int(row["id"]) if row and row.get("id") is not None else None,
+                    detail="Dry-run only" if dry_run else None,
                 )
             )
         except Exception:
@@ -610,6 +621,7 @@ def batch_create_users(payload: ApiUserBatchCreateIn, _: str = Depends(_require_
             )
 
     return ApiUserBatchCreateOut(
+        dry_run=dry_run,
         total=len(payload.users),
         created=created,
         skipped=skipped,
@@ -1202,6 +1214,98 @@ def create_student(
         ),
     )
     return StudentCreateResponse.model_validate(row)
+
+
+@app.post("/students/batch-create", response_model=StudentBatchCreateOut)
+def batch_create_students(
+    payload: StudentBatchCreateIn,
+    _: str = Depends(_require_write_access),
+    dry_run: bool = Query(default=False),
+):
+    created = 0
+    errors = 0
+    results: list[StudentBatchCreateResult] = []
+
+    for item in payload.students:
+        name = item.name.strip()
+        email = item.email.strip()
+        try:
+            sex = _normalize_sex(item.sex)
+            if dry_run:
+                row = {"id": None}
+            else:
+                row = execute_returning_one(
+                    """
+                    INSERT INTO t_students (
+                        name, sex, direction, postalcode, belt, email, phone, phone2, weight,
+                        country, taxid, birthday, location_id, newsletter_opt_in, is_minor,
+                        guardian_name, guardian_email, guardian_phone, guardian_phone2, guardian_relationship
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                    )
+                    RETURNING id
+                    """,
+                    (
+                        name,
+                        sex,
+                        item.direction,
+                        item.postalcode,
+                        item.belt,
+                        email,
+                        item.phone,
+                        item.phone2,
+                        item.weight,
+                        item.country,
+                        item.taxid,
+                        item.birthday,
+                        item.location_id,
+                        item.newsletter_opt_in,
+                        item.is_minor,
+                        item.guardian_name,
+                        item.guardian_email,
+                        item.guardian_phone,
+                        item.guardian_phone2,
+                        item.guardian_relationship,
+                    ),
+                )
+            created += 1
+            results.append(
+                StudentBatchCreateResult(
+                    name=name,
+                    email=email,
+                    status="would_create" if dry_run else "created",
+                    id=int(row["id"]) if row and row.get("id") is not None else None,
+                    detail="Dry-run only" if dry_run else None,
+                )
+            )
+        except HTTPException as exc:
+            errors += 1
+            results.append(
+                StudentBatchCreateResult(
+                    name=name,
+                    email=email,
+                    status="error",
+                    detail=str(exc.detail),
+                )
+            )
+        except Exception:
+            errors += 1
+            results.append(
+                StudentBatchCreateResult(
+                    name=name,
+                    email=email,
+                    status="error",
+                    detail="Insert failed",
+                )
+            )
+
+    return StudentBatchCreateOut(
+        dry_run=dry_run,
+        total=len(payload.students),
+        created=created,
+        errors=errors,
+        results=results,
+    )
 
 
 @app.get("/students/{student_id}", response_model=StudentDetailOut)

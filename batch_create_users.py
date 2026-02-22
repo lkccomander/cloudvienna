@@ -58,12 +58,17 @@ def main() -> int:
         default="",
         help="Fallback password when row password is omitted",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate payload and show outcome without inserting rows",
+    )
     args = parser.parse_args()
 
     try:
         raw_items = _load_json(args.file)
         users = _normalize_users(raw_items, args.default_role, args.default_password)
-        result = batch_create_api_users({"users": users})
+        result = batch_create_api_users({"users": users}, dry_run=args.dry_run)
     except (ValueError, OSError, json.JSONDecodeError) as exc:
         print(f"Input error: {exc}")
         return 2

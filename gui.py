@@ -3,7 +3,6 @@ import os
 import re
 import subprocess
 import sys
-import time
 import tkinter as tk
 import traceback
 from tkinter import messagebox, ttk
@@ -15,44 +14,39 @@ from i18n import init_i18n, t
 from ui import about, attendance, locations, news_notifications, reports, sessions, settings, students, teachers, users
 
 
-_THINKING_SPINNER = ("⠇", "⠙", "⠸", "⠴", "⠦", "⠓")
-
-
 def _run_pre_login_tests() -> bool:
+    enabled = os.getenv("APP_PRELOGIN_TESTS", "").strip().lower() in {"1", "true", "yes", "on"}
+    if not enabled:
+        print("[client] pre-login tests disabled (set APP_PRELOGIN_TESTS=1 to enable).")
+        return True
+
     print("\n=== PRE-TEST START ===")
     print("Running test suite before login screen...")
     print("+--------------------------------------------------------------+")
     print("| Test Status                                                  |")
     print("+--------------------------------------------------------------+")
+    max_seconds = int(os.getenv("APP_PRELOGIN_TESTS_TIMEOUT", "90"))
     try:
-        process = subprocess.Popen(
+        result = subprocess.run(
             [sys.executable, "-m", "pytest", "-rA", "-vv"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             cwd=os.path.dirname(os.path.abspath(__file__)),
+            timeout=max_seconds,
         )
-        start_ts = time.time()
-        frame_idx = 0
-        while process.poll() is None:
-            frame = _THINKING_SPINNER[frame_idx % len(_THINKING_SPINNER)]
-            elapsed = time.time() - start_ts
-            status = (
-                f"| Thinking {frame}  Running pre-login tests"
-                f"  ({elapsed:05.1f}s)           |"
-            )
-            print(f"\r{status}", end="", flush=True)
-            frame_idx += 1
-            time.sleep(0.12)
-        stdout, stderr = process.communicate()
-        print("\r| Test run complete. Collecting results...                     |")
+        print("| Test run complete. Collecting results...                     |")
         print("+--------------------------------------------------------------+")
-        result = subprocess.CompletedProcess(
-            args=process.args,
-            returncode=process.returncode,
-            stdout=stdout,
-            stderr=stderr,
-        )
+    except subprocess.TimeoutExpired as exc:
+        print("| Pre-login tests timed out; continuing startup.               |")
+        print("+--------------------------------------------------------------+")
+        if exc.stdout:
+            print(exc.stdout, end="" if exc.stdout.endswith("\n") else "\n")
+        if exc.stderr:
+            print(exc.stderr, end="" if exc.stderr.endswith("\n") else "\n")
+        print("❌ Pre-test timeout")
+        print("=== PRE-TEST END ===\n")
+        return False
     except Exception as exc:
         print(f"❌ Pre-test execution error: {exc}")
         print("=== PRE-TEST END ===\n")

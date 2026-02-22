@@ -4,8 +4,13 @@ from datetime import date, timedelta
 from pydantic import ValidationError as PydanticValidationError
 from backend.schemas import (
     ApiUserBatchCreateIn,
+    ApiUserBatchCreateOut,
+    ApiUserBatchCreateResult,
     ApiUserCreateIn,
     ReportsStudentSearchIn,
+    StudentBatchCreateOut,
+    StudentBatchCreateResult,
+    StudentBatchCreateIn,
     StudentCreateRequest,
     UserPreferencesIn,
 )
@@ -106,6 +111,21 @@ def test_api_student_create_request_requires_name():
         StudentCreateRequest(name="", sex="F", email="ana@example.com")
 
 
+def test_api_student_batch_create_accepts_valid_payload():
+    payload = StudentBatchCreateIn(
+        students=[
+            {"name": "Ana Silva", "sex": "F", "email": "ana@example.com"},
+            {"name": "Luis Meier", "sex": "M", "email": "luis@example.com"},
+        ]
+    )
+    assert len(payload.students) == 2
+
+
+def test_api_student_batch_create_requires_non_empty_list():
+    with pytest.raises(PydanticValidationError):
+        StudentBatchCreateIn(students=[])
+
+
 def test_api_reports_student_search_defaults():
     payload = ReportsStudentSearchIn()
 
@@ -146,6 +166,19 @@ def test_api_user_batch_create_requires_non_empty_list():
         ApiUserBatchCreateIn(users=[])
 
 
+def test_api_user_batch_create_accepts_would_create_status():
+    result = ApiUserBatchCreateResult(username="coach1", status="would_create", detail="Dry-run only")
+    out = ApiUserBatchCreateOut(
+        dry_run=True,
+        total=1,
+        created=1,
+        skipped=0,
+        errors=0,
+        results=[result],
+    )
+    assert out.dry_run is True
+
+
 def test_api_user_preferences_accept_valid_payload():
     payload = UserPreferencesIn(
         theme="dark",
@@ -166,6 +199,23 @@ def test_api_user_preferences_reject_invalid_theme():
 def test_api_user_preferences_reject_short_language():
     with pytest.raises(PydanticValidationError):
         UserPreferencesIn(theme="light", language="e")
+
+
+def test_api_student_batch_create_accepts_would_create_status():
+    result = StudentBatchCreateResult(
+        name="Ana Silva",
+        email="ana@example.com",
+        status="would_create",
+        detail="Dry-run only",
+    )
+    out = StudentBatchCreateOut(
+        dry_run=True,
+        total=1,
+        created=1,
+        errors=0,
+        results=[result],
+    )
+    assert out.dry_run is True
 
 # ---------------------------
 # Newsletter defaults

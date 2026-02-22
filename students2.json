@@ -1,0 +1,49 @@
+{
+  "users":[
+  {
+    "name": "Lukas Steiner",
+    "sex": "M",
+    "email": "lukas.steiner@example.com",
+    "direction": "Ringstrasse 12, Vienna",
+    "postalcode": "1010",
+    "belt": "White",
+    "phone": "+43 660 111 0001",
+    "phone2": "",
+    "weight": 78.5,
+    "country": "Austria",
+    "taxid": "AT10000001",
+    "birthday": "1998-04-14",
+    "location_id": 1,
+    "newsletter_opt_in": true,
+    "is_minor": false,
+    "guardian_name": "",
+    "guardian_email": "",
+    "guardian_phone": "",
+    "guardian_phone2": "",
+    "guardian_relationship": ""
+  },
+  {
+    "name": "Zoe Koller",
+    "sex": "F",
+    "email": "zoe.koller@example.com",
+    "direction": "Schweglerstrasse 12, Vienna",
+    "postalcode": "1150",
+    "belt": "White",
+    "phone": "+43 660 111 0030",
+    "phone2": "",
+    "weight": 49.9,
+    "country": "Austria",
+    "taxid": "AT10000030",
+    "birthday": "2011-11-04",
+    "location_id": 1,
+    "newsletter_opt_in": true,
+    "is_minor": true,
+    "guardian_name": "Daniela Koller",
+    "guardian_email": "daniela.koller@example.com",
+    "guardian_phone": "+43 660 211 0030",
+    "guardian_phone2": "",
+    "guardian_relationship": "Mother"
+  }
+]
+
+}
