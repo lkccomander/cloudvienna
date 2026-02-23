@@ -1,0 +1,67 @@
+[backend] startup env=dev db=cloudvienna@localhost:5432 env_files=C:\Projects\cloudvienna\.env.dev, C:\Projects\cloudvienna\backend\.env.dev
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Projects\cloudvienna\backend\run.py", line 47, in <module>
+    main()
+    ~~~~^^
+  File "C:\Projects\cloudvienna\backend\run.py", line 37, in main
+    uvicorn.run(
+    ~~~~~~~~~~~^
+        "backend.main:app",
+        ^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        **_ssl_kwargs(),
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Projects\cloudvienna\.venv\Lib\site-packages\uvicorn\main.py", line 580, in run
+    server.run()
+    ~~~~~~~~~~^^
+  File "C:\Projects\cloudvienna\.venv\Lib\site-packages\uvicorn\server.py", line 67, in run
+    return asyncio.run(self.serve(sockets=sockets))
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\lkcco\AppData\Local\Programs\Python\Python314\Lib\asyncio\runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Users\lkcco\AppData\Local\Programs\Python\Python314\Lib\asyncio\runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\lkcco\AppData\Local\Programs\Python\Python314\Lib\asyncio\base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "C:\Projects\cloudvienna\.venv\Lib\site-packages\uvicorn\server.py", line 71, in serve
+    await self._serve(sockets)
+  File "C:\Projects\cloudvienna\.venv\Lib\site-packages\uvicorn\server.py", line 78, in _serve
+    config.load()
+    ~~~~~~~~~~~^^
+  File "C:\Projects\cloudvienna\.venv\Lib\site-packages\uvicorn\config.py", line 436, in load
+    self.loaded_app = import_from_string(self.app)
+                      ~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Projects\cloudvienna\.venv\Lib\site-packages\uvicorn\importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+  File "C:\Users\lkcco\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py", line 88, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1398, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1371, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1342, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 938, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 759, in exec_module
+  File "<frozen importlib._bootstrap>", line 491, in _call_with_frames_removed
+  File "C:\Projects\cloudvienna\backend\main.py", line 17, in <module>
+    from backend.db import execute, execute_returning_one, fetch_all, fetch_one
+  File "C:\Projects\cloudvienna\backend\db.py", line 15, in <module>
+    _POOL = SimpleConnectionPool(
+        minconn=1,
+    ...<6 lines>...
+        sslmode=DB_SSLMODE,
+    )
+  File "C:\Projects\cloudvienna\.venv\Lib\site-packages\psycopg2\pool.py", line 59, in __init__
+    self._connect()
+    ~~~~~~~~~~~~~^^
+  File "C:\Projects\cloudvienna\.venv\Lib\site-packages\psycopg2\pool.py", line 63, in _connect
+    conn = psycopg2.connect(*self._args, **self._kwargs)
+  File "C:\Projects\cloudvienna\.venv\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: FATAL:  password authentication failed for user "postgress"

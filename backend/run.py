@@ -9,6 +9,7 @@ from backend.config import (
     DB_NAME,
     DB_PORT,
     ENV_FILES_PRESENT,
+    validate_security_settings,
 )
 
 
@@ -24,6 +25,8 @@ def _ssl_kwargs() -> dict:
 
 def main():
     import uvicorn
+
+    validate_security_settings()
 
     env_sources = ", ".join(ENV_FILES_PRESENT) if ENV_FILES_PRESENT else "none"
     print(

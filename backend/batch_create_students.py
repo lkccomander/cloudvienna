@@ -1,18 +1,26 @@
 import argparse
 import json
+import sys
+from pathlib import Path
 
-from api_client import ApiError, batch_create_students
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def _load_students(path: str) -> list[dict]:
     with open(path, "r", encoding="utf-8-sig") as handle:
         data = json.load(handle)
+    if isinstance(data, dict):
+        data = data.get("students", [])
     if not isinstance(data, list):
-        raise ValueError("Input JSON must be a list of students.")
+        raise ValueError("Input JSON must be a list or an object with key 'students'.")
     return data
 
 
 def main() -> int:
+    from api_client import ApiError, batch_create_students
+
     parser = argparse.ArgumentParser(description="Batch create students from JSON file")
     parser.add_argument("--file", required=True, help="Path to JSON file")
     parser.add_argument(
