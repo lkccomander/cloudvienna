@@ -2,9 +2,11 @@ import jwt
 import pytest
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
+import importlib
+import sys
+import types
 
 from backend import config
-from backend.main import _LOGIN_BLOCKED_UNTIL, _LOGIN_FAILURES, _require_auth, login
 from backend.schemas import LoginRequest
 from backend.security import create_access_token, hash_password, verify_access_token, verify_password
 
@@ -15,6 +17,18 @@ class _DummyClient:
 
 class _DummyRequest:
     client = _DummyClient()
+
+
+def _load_backend_main_with_stubbed_db():
+    stub_db = types.SimpleNamespace(
+        execute=lambda *args, **kwargs: None,
+        execute_returning_one=lambda *args, **kwargs: None,
+        fetch_all=lambda *args, **kwargs: [],
+        fetch_one=lambda *args, **kwargs: None,
+    )
+    sys.modules["backend.db"] = stub_db
+    sys.modules.pop("backend.main", None)
+    return importlib.import_module("backend.main")
 
 
 def test_password_hash_roundtrip():
@@ -32,6 +46,7 @@ def test_verify_access_token_rejects_missing_subject():
 
 
 def test_require_auth_checks_active_user(monkeypatch):
+    backend_main = _load_backend_main_with_stubbed_db()
     token = create_access_token("activeuser")
     called = {"checked": False}
 
@@ -40,19 +55,21 @@ def test_require_auth_checks_active_user(monkeypatch):
         assert subject == "activeuser"
         return {"username": subject, "active": True}
 
-    monkeypatch.setattr("backend.main._get_user_by_subject", _fake_get_user_by_subject)
+    monkeypatch.setattr(backend_main, "_get_user_by_subject", _fake_get_user_by_subject)
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
-    subject = _require_auth(credentials)
+    subject = backend_main._require_auth(credentials)
     assert subject == "activeuser"
     assert called["checked"] is True
 
 
 def test_login_rate_limit_blocks_after_repeated_failures(monkeypatch):
-    monkeypatch.setattr("backend.main.API_LOGIN_RATE_LIMIT_ATTEMPTS", 2)
-    monkeypatch.setattr("backend.main.API_LOGIN_RATE_LIMIT_WINDOW_SECONDS", 300)
-    monkeypatch.setattr("backend.main.API_LOGIN_BLOCK_SECONDS", 60)
+    backend_main = _load_backend_main_with_stubbed_db()
+    monkeypatch.setattr(backend_main, "API_LOGIN_RATE_LIMIT_ATTEMPTS", 2)
+    monkeypatch.setattr(backend_main, "API_LOGIN_RATE_LIMIT_WINDOW_SECONDS", 300)
+    monkeypatch.setattr(backend_main, "API_LOGIN_BLOCK_SECONDS", 60)
     monkeypatch.setattr(
-        "backend.main.fetch_one",
+        backend_main,
+        "fetch_one",
         lambda *_args, **_kwargs: {
             "username": "coach1",
             "password_hash": "hash",
@@ -60,24 +77,24 @@ def test_login_rate_limit_blocks_after_repeated_failures(monkeypatch):
             "role": "coach",
         },
     )
-    monkeypatch.setattr("backend.main.verify_password", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(backend_main, "verify_password", lambda *_args, **_kwargs: False)
 
-    _LOGIN_FAILURES.clear()
-    _LOGIN_BLOCKED_UNTIL.clear()
+    backend_main._LOGIN_FAILURES.clear()
+    backend_main._LOGIN_BLOCKED_UNTIL.clear()
 
     payload = LoginRequest(username="coach1", password="bad-password")
     request = _DummyRequest()
 
     with pytest.raises(HTTPException) as first:
-        login(payload, request)
+        backend_main.login(payload, request)
     assert first.value.status_code == 401
 
     with pytest.raises(HTTPException) as second:
-        login(payload, request)
+        backend_main.login(payload, request)
     assert second.value.status_code == 401
 
     with pytest.raises(HTTPException) as third:
-        login(payload, request)
+        backend_main.login(payload, request)
     assert third.value.status_code == 429
 
 
