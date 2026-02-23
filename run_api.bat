@@ -4,6 +4,8 @@ setlocal
 REM Always run from this script's folder.
 cd /d "%~dp0"
 
+if "%APP_ENV%"=="" set "APP_ENV=dev"
+
 if exist ".venv\pyvenv.cfg" (
     findstr /b /c:"home = /usr/bin" ".venv\pyvenv.cfg" >nul
     if not errorlevel 1 (
@@ -33,6 +35,22 @@ if errorlevel 1 (
     python -m pip install -r requirements.txt
     if errorlevel 1 (
         echo [ERROR] Dependency installation failed.
+        exit /b 1
+    )
+)
+
+REM Strict config validation + bootstrap fallback.
+python scripts\check_instance_config.py --env %APP_ENV%
+if errorlevel 1 (
+    echo [INFO] Missing or invalid config detected. Running bootstrap for APP_ENV=%APP_ENV%...
+    python scripts\bootstrap_instance.py --env %APP_ENV%
+    if errorlevel 1 (
+        echo [ERROR] Bootstrap failed. API will not start.
+        exit /b 1
+    )
+    python scripts\check_instance_config.py --env %APP_ENV%
+    if errorlevel 1 (
+        echo [ERROR] Configuration is still invalid after bootstrap.
         exit /b 1
     )
 )

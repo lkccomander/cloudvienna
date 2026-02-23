@@ -59,6 +59,23 @@ API_PROXY_HEADERS = os.getenv("API_PROXY_HEADERS", "true").strip().lower() in {"
 API_JWT_SECRET = os.getenv("API_JWT_SECRET", "CHANGE_ME_IN_ENV")
 API_JWT_ALGORITHM = "HS256"
 API_TOKEN_MINUTES = int(os.getenv("API_TOKEN_MINUTES", "60"))
+API_LOGIN_RATE_LIMIT_ATTEMPTS = int(os.getenv("API_LOGIN_RATE_LIMIT_ATTEMPTS", "5"))
+API_LOGIN_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("API_LOGIN_RATE_LIMIT_WINDOW_SECONDS", "300"))
+API_LOGIN_BLOCK_SECONDS = int(os.getenv("API_LOGIN_BLOCK_SECONDS", "900"))
 
 API_ADMIN_USER = os.getenv("API_ADMIN_USER", "admin")
 API_ADMIN_PASSWORD = os.getenv("API_ADMIN_PASSWORD", "change-me")
+
+
+def validate_security_settings() -> None:
+    if APP_ENV not in {"prod", "cloud"}:
+        return
+
+    if API_JWT_SECRET == "CHANGE_ME_IN_ENV" or len(API_JWT_SECRET.strip()) < 32:
+        raise RuntimeError(
+            "Invalid API_JWT_SECRET for production/cloud. Set a strong secret with at least 32 characters."
+        )
+    if API_ADMIN_PASSWORD == "change-me" or len(API_ADMIN_PASSWORD.strip()) < 12:
+        raise RuntimeError(
+            "Invalid API_ADMIN_PASSWORD for production/cloud. Set a non-default password with at least 12 characters."
+        )

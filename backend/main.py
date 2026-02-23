@@ -1,12 +1,18 @@
 import json
+import threading
+import time
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend.config import (
     API_ADMIN_PASSWORD,
     API_ADMIN_USER,
+    API_LOGIN_BLOCK_SECONDS,
+    API_LOGIN_RATE_LIMIT_ATTEMPTS,
+    API_LOGIN_RATE_LIMIT_WINDOW_SECONDS,
     API_TOKEN_MINUTES,
+    validate_security_settings,
 )
 from backend.db import execute, execute_returning_one, fetch_all, fetch_one
 from backend.schemas import (
@@ -59,6 +65,44 @@ from backend.security import (
 
 app = FastAPI(title="BJJ Vienna API", version="0.1.0")
 auth_scheme = HTTPBearer(auto_error=True)
+_LOGIN_LOCK = threading.Lock()
+_LOGIN_FAILURES: dict[str, list[float]] = {}
+_LOGIN_BLOCKED_UNTIL: dict[str, float] = {}
+
+validate_security_settings()
+
+
+def _login_identity(username: str, request: Request) -> str:
+    host = request.client.host if request.client else "unknown"
+    return f"{username.lower()}@{host}"
+
+
+def _is_login_blocked(identity: str) -> bool:
+    now = time.time()
+    with _LOGIN_LOCK:
+        blocked_until = _LOGIN_BLOCKED_UNTIL.get(identity, 0.0)
+        if blocked_until <= now:
+            _LOGIN_BLOCKED_UNTIL.pop(identity, None)
+            return False
+        return True
+
+
+def _record_failed_login(identity: str) -> None:
+    now = time.time()
+    threshold = now - API_LOGIN_RATE_LIMIT_WINDOW_SECONDS
+    with _LOGIN_LOCK:
+        failures = [ts for ts in _LOGIN_FAILURES.get(identity, []) if ts >= threshold]
+        failures.append(now)
+        _LOGIN_FAILURES[identity] = failures
+        if len(failures) >= API_LOGIN_RATE_LIMIT_ATTEMPTS:
+            _LOGIN_BLOCKED_UNTIL[identity] = now + API_LOGIN_BLOCK_SECONDS
+            _LOGIN_FAILURES.pop(identity, None)
+
+
+def _clear_failed_logins(identity: str) -> None:
+    with _LOGIN_LOCK:
+        _LOGIN_FAILURES.pop(identity, None)
+        _LOGIN_BLOCKED_UNTIL.pop(identity, None)
 
 
 @app.get("/")
@@ -252,7 +296,9 @@ def _normalize_sex(value: str) -> str:
 def _require_auth(
     credentials: HTTPAuthorizationCredentials = Depends(auth_scheme),
 ) -> str:
-    return verify_access_token(credentials.credentials)
+    subject = verify_access_token(credentials.credentials)
+    _get_user_by_subject(subject)
+    return subject
 
 
 def _get_user_by_subject(subject: str):
@@ -407,8 +453,14 @@ def reports_students_export(payload: ReportsStudentSearchIn, _: str = Depends(_r
 
 
 @app.post("/auth/login", response_model=TokenResponse)
-def login(payload: LoginRequest):
+def login(payload: LoginRequest, request: Request):
     username = payload.username.strip()
+    identity = _login_identity(username, request)
+    if _is_login_blocked(identity):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed login attempts. Try again later.",
+        )
     row = fetch_one(
         """
         SELECT username, password_hash, active
@@ -419,20 +471,24 @@ def login(payload: LoginRequest):
         (username,),
     )
     if not row:
+        _record_failed_login(identity)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
     if not row.get("active"):
+        _record_failed_login(identity)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Inactive user",
         )
     if not verify_password(payload.password, row["password_hash"]):
+        _record_failed_login(identity)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
+    _clear_failed_logins(identity)
     token = create_access_token(subject=row["username"])
     return TokenResponse(
         access_token=token,

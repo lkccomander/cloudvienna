@@ -64,6 +64,9 @@ Set these before running:
 - `API_ADMIN_PASSWORD` (default: `change-me`)
 - `API_JWT_SECRET` (required in production)
 - `API_TOKEN_MINUTES` (optional, default: `60`)
+- `API_LOGIN_RATE_LIMIT_ATTEMPTS` (optional, default: `5`)
+- `API_LOGIN_RATE_LIMIT_WINDOW_SECONDS` (optional, default: `300`)
+- `API_LOGIN_BLOCK_SECONDS` (optional, default: `900`)
 - `API_HOST` (optional, default: `127.0.0.1`)
 - `API_PORT` (optional, default: `8000`)
 - `API_PROXY_HEADERS` (optional, default: `true`)
@@ -100,6 +103,37 @@ curl -s -X POST http://127.0.0.1:8000/auth/login \
   -d '{"username":"admin","password":"change-me"}'
 ```
 
+## Bootstrap (backend + client)
+
+Single script to initialize both backend environment and desktop client settings:
+
+```bash
+python3 scripts/bootstrap_instance.py --env dev
+```
+
+For production/cloud (non-interactive example):
+
+```bash
+python3 scripts/bootstrap_instance.py \
+  --env prod \
+  --non-interactive \
+  --db-host localhost \
+  --db-port 5432 \
+  --db-name cloudvienna \
+  --db-user postgres \
+  --db-password "replace-me" \
+  --api-base-url "https://api.example.com" \
+  --api-user admin \
+  --api-password "replace-me" \
+  --api-verify-tls true \
+  --api-admin-password "replace-me-with-strong-admin-password" \
+  --api-jwt-secret "replace-me-with-very-long-random-secret"
+```
+
+This writes:
+- backend env file: `.env.dev` / `.env.prod` / `.env.cloud`
+- desktop client config: `app_settings.json` (`db` + `api` blocks)
+
 ## GUI -> API config
 
 Add this block to your `app_settings.json` so the Students tab can use the API:
@@ -120,5 +154,7 @@ Notes:
 - Keep `verify_tls: true` in production.
 - For local self-signed certificates, either trust the cert in OS trust store or set `ca_file`.
 - Use `verify_tls: false` only for temporary local development.
+- In `APP_ENV=prod` or `APP_ENV=cloud`, API startup fails fast if `API_JWT_SECRET` is default/weak
+  or `API_ADMIN_PASSWORD` is default/weak.
 - On first startup, the API bootstraps an admin user into `t_api_users` from
   `API_ADMIN_USER` and `API_ADMIN_PASSWORD` if that username does not exist yet.
