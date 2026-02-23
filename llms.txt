@@ -9,7 +9,7 @@ Tech Stack
 - Python 3.x
 - Tkinter UI modules in `ui/`
 - PostgreSQL via `psycopg2`
-- FastAPI in `main.py` / `backend/`
+- FastAPI in `backend/main.py` (root `main.py` is compatibility wrapper)
 - i18n JSON files in `i18n/`
 
 Important Files
@@ -24,7 +24,7 @@ Important Files
 
 Run / Test
 - Desktop app: `python gui.py`
-- API: `python main.py` or `python backend/main.py`
+- API: `python -m backend.run` (recommended) or `python main.py` (compatibility)
 - Tests: `pytest -q`
 
 Project Conventions

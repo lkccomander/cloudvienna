@@ -10,16 +10,13 @@ BACKEND_DIR = Path(__file__).resolve().parent
 APP_SETTINGS_PATH = ROOT_DIR / "app_settings.json"
 APP_ENV = os.getenv("APP_ENV", "dev").strip().lower()
 
-# Backend-specific env files have priority for API credentials/settings.
-# Root-level env files are kept as fallback for compatibility.
+# Backend uses backend-scoped env files as single source of truth.
 _env_variant = {
     "dev": ".env.dev",
     "prod": ".env.prod",
     "cloud": ".env.cloud",
 }.get(APP_ENV, ".env")
 ENV_FILE_PRIORITY = [
-    ROOT_DIR / ".env",
-    ROOT_DIR / _env_variant,
     BACKEND_DIR / ".env",
     BACKEND_DIR / _env_variant,
 ]

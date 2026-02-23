@@ -11,11 +11,12 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
+BACKEND_DIR = ROOT_DIR / "backend"
 APP_SETTINGS_PATH = ROOT_DIR / "app_settings.json"
 ENV_FILE_BY_ENV = {
-    "dev": ROOT_DIR / ".env.dev",
-    "prod": ROOT_DIR / ".env.prod",
-    "cloud": ROOT_DIR / ".env.cloud",
+    "dev": BACKEND_DIR / ".env.dev",
+    "prod": BACKEND_DIR / ".env.prod",
+    "cloud": BACKEND_DIR / ".env.cloud",
 }
 SSL_MODES = {"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}
 

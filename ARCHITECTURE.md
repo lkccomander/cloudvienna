@@ -4,8 +4,8 @@
 - BJJ Vienna is a desktop application built with Tkinter. The main window is a tabbed UI
   composed of feature modules under `ui/`.
 - Data is stored in a PostgreSQL database and accessed through `db.py` using `psycopg2`.
-- There is a small FastAPI service in `main.py` for attendance-related endpoints
-  (likely optional or experimental).
+- FastAPI backend implementation is centralized in `backend/main.py`.
+- Root `main.py` is a compatibility wrapper that forwards to `backend.run`.
 - UI text is localized via JSON files under `i18n/`, with language selection persisted in
   `app_settings.json`.
 
@@ -19,7 +19,8 @@
 - `ui/`: Feature tabs (students, teachers, locations, sessions, attendance, reports, settings, about).
 - `db.py`: Database connection and query execution via `execute(...)`.
 - `version.py`: App version string used in the window title.
-- `main.py`: FastAPI app with attendance endpoints (if run separately).
+- `backend/main.py`: Canonical FastAPI app.
+- `main.py`: compatibility entrypoint for `python main.py`.
 - `i18n.py`: Loads translations and persists language choice.
 
 ## Data access

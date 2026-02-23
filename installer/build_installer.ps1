@@ -26,7 +26,7 @@ $iscc = Get-Command iscc -ErrorAction SilentlyContinue
 if (-not $iscc) {
     $candidate = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
     if (Test-Path $candidate) {
-        $iscc = Get-Item $candidate
+        $iscc = $candidate
     }
 }
 
@@ -37,7 +37,12 @@ if (-not $iscc) {
 }
 
 Write-Host "[3/3] Building installer with Inno Setup..."
-& $iscc.Source $issScript
+if ($iscc -is [string]) {
+    $isccExe = $iscc
+} else {
+    $isccExe = $iscc.Source
+}
+& $isccExe $issScript
 
 if (Test-Path ".\dist\BJJVienna-Setup.exe") {
     Write-Host "Done: dist\BJJVienna-Setup.exe"

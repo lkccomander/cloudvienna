@@ -38,8 +38,6 @@ def _parse_env_file(path: Path) -> dict[str, str]:
 def _load_effective_env(env_name: str) -> tuple[dict[str, str], list[Path]]:
     variant = _env_variant(env_name)
     ordered = [
-        ROOT_DIR / ".env",
-        ROOT_DIR / variant,
         BACKEND_DIR / ".env",
         BACKEND_DIR / variant,
     ]

@@ -6,6 +6,9 @@ cd /d "%~dp0"
 
 if "%APP_ENV%"=="" set "APP_ENV=dev"
 
+REM Startup banner
+powershell -NoProfile -Command "Write-Host '========================================' -ForegroundColor DarkGray; Write-Host 'TO CHANGE THE ENV CHANGE LINE 7' -ForegroundColor Red; Write-Host ('Using APP_ENV=' + $env:APP_ENV) -ForegroundColor DarkYellow; Write-Host '========================================' -ForegroundColor DarkGray"
+
 if exist ".venv\pyvenv.cfg" (
     findstr /b /c:"home = /usr/bin" ".venv\pyvenv.cfg" >nul
     if not errorlevel 1 (

@@ -97,7 +97,7 @@ begin
   AddField(ConfigPage, 'API base URL', ApiBaseUrlEdit, TopPos, 'http://127.0.0.1:8000');
   AddField(ConfigPage, 'API username', ApiUserEdit, TopPos, 'admin');
   AddField(ConfigPage, 'API password', ApiPasswordEdit, TopPos, '');
-  ApiPasswordEdit.Password := True;
+  ApiPasswordEdit.PasswordChar := '*';
 
   ApiVerifyTlsCheck := TNewCheckBox.Create(ConfigPage);
   ApiVerifyTlsCheck.Parent := ConfigPage.Surface;

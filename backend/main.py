@@ -1,6 +1,7 @@
 import json
 import threading
 import time
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -63,7 +64,6 @@ from backend.security import (
 )
 
 
-app = FastAPI(title="BJJ Vienna API", version="0.1.0")
 auth_scheme = HTTPBearer(auto_error=True)
 _LOGIN_LOCK = threading.Lock()
 _LOGIN_FAILURES: dict[str, list[float]] = {}
@@ -105,13 +105,7 @@ def _clear_failed_logins(identity: str) -> None:
         _LOGIN_BLOCKED_UNTIL.pop(identity, None)
 
 
-@app.get("/")
-def root():
-    return {"status": "ok", "service": "bjj-vienna-api"}
-
-
-@app.on_event("startup")
-def startup_migrations():
+def _run_startup_migrations():
     # Keep API resilient with legacy databases used by the current desktop app.
     execute(
         """
@@ -275,6 +269,20 @@ def startup_migrations():
         )
         """
     )
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    _run_startup_migrations()
+    yield
+
+
+app = FastAPI(title="BJJ Vienna API", version="0.1.0", lifespan=lifespan)
+
+
+@app.get("/")
+def root():
+    return {"status": "ok", "service": "bjj-vienna-api"}
 
 
 def _normalize_sex(value: str) -> str:

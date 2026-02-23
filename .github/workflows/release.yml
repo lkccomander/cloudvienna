@@ -24,6 +24,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # Quality gate: production release must pass lint and tests.
+      - name: Lint (ruff)
+        run: |
+          ruff check .
+
+      - name: Tests (pytest)
+        run: |
+          pytest -q
+
       - name: Verify icon exists
         run: |
           if (!(Test-Path "logo1.ico")) { throw "logo1.ico not found at repo root." }

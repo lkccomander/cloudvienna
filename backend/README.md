@@ -131,7 +131,7 @@ python3 scripts/bootstrap_instance.py \
 ```
 
 This writes:
-- backend env file: `.env.dev` / `.env.prod` / `.env.cloud`
+- backend env file: `backend/.env.dev` / `backend/.env.prod` / `backend/.env.cloud`
 - desktop client config: `app_settings.json` (`db` + `api` blocks)
 
 ## GUI -> API config

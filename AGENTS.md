@@ -8,14 +8,14 @@ Guía para agentes que trabajen en este repositorio.
 
 ## Puntos de entrada
 - Desktop: `gui.py`
-- API: `main.py` y `backend/main.py`
+- API: `backend/main.py` (canónico). `main.py` es wrapper de compatibilidad.
 - Acceso a datos: `db.py`
 - UI modular: `ui/*.py`
 
 ## Comandos útiles
 - Instalar dependencias: `pip install -r requirements.txt`
 - Ejecutar app desktop: `python gui.py`
-- Ejecutar API: `python main.py`
+- Ejecutar API: `python -m backend.run` (recomendado) o `python main.py` (compatibilidad)
 - Ejecutar tests: `pytest -q`
 
 ## Reglas de trabajo

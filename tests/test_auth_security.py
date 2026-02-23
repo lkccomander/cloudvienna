@@ -10,6 +10,8 @@ from backend import config
 from backend.schemas import LoginRequest
 from backend.security import create_access_token, hash_password, verify_access_token, verify_password
 
+_BACKEND_MAIN = None
+
 
 class _DummyClient:
     host = "127.0.0.1"
@@ -20,6 +22,9 @@ class _DummyRequest:
 
 
 def _load_backend_main_with_stubbed_db():
+    global _BACKEND_MAIN
+    if _BACKEND_MAIN is not None:
+        return _BACKEND_MAIN
     stub_db = types.SimpleNamespace(
         execute=lambda *args, **kwargs: None,
         execute_returning_one=lambda *args, **kwargs: None,
@@ -27,8 +32,8 @@ def _load_backend_main_with_stubbed_db():
         fetch_one=lambda *args, **kwargs: None,
     )
     sys.modules["backend.db"] = stub_db
-    sys.modules.pop("backend.main", None)
-    return importlib.import_module("backend.main")
+    _BACKEND_MAIN = importlib.import_module("backend.main")
+    return _BACKEND_MAIN
 
 
 def test_password_hash_roundtrip():
