@@ -4,7 +4,7 @@ Guía para agentes que trabajen en este repositorio.
 
 ## Objetivo del proyecto
 - Aplicación de escritorio para gestión de academia BJJ (Tkinter + PostgreSQL).
-- API opcional para asistencia (FastAPI).
+- API FastAPI para autenticación y operaciones de backend.
 
 ## Puntos de entrada
 - Desktop: `gui.py`
@@ -25,9 +25,10 @@ Guía para agentes que trabajen en este repositorio.
 - No introducir secretos en código o commits.
 
 ## Base de datos y configuración
-- Config local en `app_settings.json`.
-- Variables de entorno en `.env`, `.env.dev`, `.env.prod`, `.env.cloud`.
-- Respetar el patrón actual de carga de credenciales (env/keyring).
+- Config del cliente desktop en `app_settings.json`.
+- Config del backend en `backend/.env*` (`backend/.env.dev`, `backend/.env.prod`, `backend/.env.cloud`).
+- `APP_ENV` selecciona el archivo de entorno backend a usar.
+- Mantener el patrón actual de carga de credenciales (env/keyring); no hardcodear secretos.
 
 ## i18n
 - Archivos de idioma: `i18n/en.json` y `i18n/de-AT.json`.
@@ -35,6 +36,8 @@ Guía para agentes que trabajen en este repositorio.
 
 ## Validación mínima antes de terminar
 - Ejecutar `pytest -q` si el cambio toca lógica validable.
+- Si cambia configuración/arranque backend, ejecutar:
+  - `python3 scripts/check_instance_config.py --env dev` (o `prod/cloud` según el caso)
 - Si cambia UI, revisar que `gui.py` levante sin errores.
 - Si cambia reportes/exportación, validar flujo CSV/PDF/Excel.
 
