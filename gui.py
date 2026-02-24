@@ -8,7 +8,6 @@ import traceback
 from tkinter import messagebox, ttk
 
 from api_client import ApiError, clear_session_credentials, is_api_configured, login_with_credentials
-from db import get_client_startup_context
 from version import __version__
 from i18n import init_i18n, t
 from ui import about, attendance, locations, news_notifications, reports, sessions, settings, students, teachers, users
@@ -228,12 +227,7 @@ def main():
         ],
         force=True,
     )
-    startup_ctx = get_client_startup_context()
-    print(
-        f"[client] startup env={startup_ctx['env']} "
-        f"db={startup_ctx['db_name']}@{startup_ctx['db_host']}:{startup_ctx['db_port']} "
-        f"env_file={startup_ctx['env_source']}"
-    )
+    print(f"[client] startup env={os.getenv('APP_ENV', 'default').lower()} mode=api-only")
 
     try:
         init_i18n()

@@ -7,7 +7,7 @@ cd /d "%~dp0"
 if "%APP_ENV%"=="" set "APP_ENV=prod"
 
 REM Startup banner
-powershell -NoProfile -Command "Write-Host '========================================' -ForegroundColor DarkGray; Write-Host 'TO CHANGE THE ENV CHANGE LINE 7' -ForegroundColor Red; Write-Host ('Using APP_ENV=' + $env:APP_ENV) -ForegroundColor DarkYellow; Write-Host '========================================' -ForegroundColor DarkGray"
+powershell -NoProfile -Command "Write-Host '========================================' -ForegroundColor DarkGray; Write-Host 'Set APP_ENV before running to change environment' -ForegroundColor Red; Write-Host ('Using APP_ENV=' + $env:APP_ENV) -ForegroundColor DarkYellow; Write-Host '========================================' -ForegroundColor DarkGray"
 
 if exist ".venv\pyvenv.cfg" (
     findstr /b /c:"home = /usr/bin" ".venv\pyvenv.cfg" >nul
@@ -22,14 +22,14 @@ if exist ".venv\pyvenv.cfg" (
     )
 )
 
-if not exist ".venv\Scripts\activate" (
+if not exist ".venv\Scripts\activate.bat" (
     echo [ERROR] Virtual environment activation script not found:
     echo         .venv\Scripts\activate.bat
     echo Create it first with: py -m venv .venv
     exit /b 1
 )
 
-call ".venv\Scripts\activate"
+call ".venv\Scripts\activate.bat"
 
 REM Auto-install dependencies only if key API packages are missing.
 python -c "import fastapi,uvicorn,dotenv" >nul 2>&1
