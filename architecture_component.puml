@@ -19,23 +19,42 @@ package "Desktop App (Tkinter)" {
   [ui.settings] as ui_settings
   [ui.about] as ui_about
 
-  [db.py\nexecute(query, params)] as db
+  [api_client.py\nJWT login + Bearer calls] as api_client
+  [db.py\nlegacy direct DB path] as db
   [i18n.py\ntranslations + language persistence] as i18n
   [validation_middleware.py] as validation
   [error_middleware.py] as errors
   [version.py] as version
 }
 
-package "Optional Service Layer" {
-  [main.py\nFastAPI attendance endpoints] as api
+package "API Backend (Canonical)" {
+  [backend/main.py\nFastAPI app + auth/roles] as api
+  [backend/run.py\nuvicorn launcher] as api_run
+  [backend/config.py\nenv loading + security validation] as api_cfg
+  [backend/security.py\nJWT + password hashing] as api_sec
+  [backend/db.py\nDB pool + queries] as api_db
+}
+
+package "Compatibility Entry Point" {
+  [main.py\nwrapper -> backend.run] as main_wrapper
+}
+
+package "Ops / Tooling" {
+  [scripts/bootstrap_instance.py\nbootstrap env + app_settings] as bootstrap
+  [scripts/check_instance_config.py\nstrict env/settings validation] as check_cfg
+  [run_api.bat\nstartup banner + validation] as run_api_bat
+  [installer/bjjvienna.iss\ninstaller + first-run settings page] as installer
+  [.github/workflows/ci.yml\n3.11 stable + 3.14 experimental] as ci
+  [.github/workflows/release.yml\nquality gate + release] as release
 }
 
 database "PostgreSQL" as pg
 collections "i18n/*.json" as i18n_files
 collections "app_settings.json" as settings
-collections ".env* + keyring" as env_cfg
+collections "backend/.env*" as env_cfg
 collections "app.log" as logs
 collections "CSV/PDF/XLSX exports" as exports
+collections "docs/PROD_SECURITY_CHECKLIST.md" as prod_docs
 
 user --> gui
 
@@ -50,13 +69,21 @@ gui --> ui_settings
 gui --> ui_about
 gui --> version
 
-ui_students --> db
-ui_teachers --> db
-ui_locations --> db
-ui_sessions --> db
-ui_attendance --> db
-ui_news --> db
-ui_reports --> db
+ui_students --> api_client
+ui_teachers --> api_client
+ui_locations --> api_client
+ui_sessions --> api_client
+ui_attendance --> api_client
+ui_news --> api_client
+ui_reports --> api_client
+
+ui_students ..> db : fallback/legacy
+ui_teachers ..> db : fallback/legacy
+ui_locations ..> db : fallback/legacy
+ui_sessions ..> db : fallback/legacy
+ui_attendance ..> db : fallback/legacy
+ui_news ..> db : fallback/legacy
+ui_reports ..> db : fallback/legacy
 
 ui_students --> validation
 ui_teachers --> validation
@@ -81,6 +108,17 @@ ui_about --> i18n
 
 db --> pg
 db --> env_cfg
+api_client --> settings
+api_client --> api
+
+api_run --> api
+main_wrapper --> api_run
+api --> api_sec
+api --> api_db
+api --> api_cfg
+api_db --> pg
+api_cfg --> env_cfg
+
 i18n --> i18n_files
 i18n --> settings
 ui_about --> settings
@@ -89,12 +127,25 @@ errors --> logs
 ui_about --> logs
 ui_reports --> exports
 
-api --> db
-api --> pg
+bootstrap --> env_cfg
+bootstrap --> settings
+check_cfg --> env_cfg
+check_cfg --> settings
+run_api_bat --> check_cfg
+run_api_bat --> bootstrap
+installer --> settings
+release --> ci
+release --> prod_docs
 
 note right of api
-  Service is present in repo and can run separately.
-  Desktop app is the primary runtime entry point.
+  Canonical backend implementation.
+  Includes JWT auth, roles and
+  login rate-limiting.
+end note
+
+note right of env_cfg
+  Backend source of truth:
+  backend/.env*
 end note
 
 @enduml

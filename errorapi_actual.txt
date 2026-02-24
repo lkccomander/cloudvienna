@@ -1,0 +1,77 @@
+Resumen actualizado (estado actual)
+Fecha de corte: hoy
+
+# =====================================================
+
+1) Estado general
+- Proyecto en estado funcional para dry-run pre-produccion.
+- Backend canonico: backend/main.py
+- main.py raiz: wrapper de compatibilidad (reexporta app y ejecuta backend.run)
+
+2) Bloqueantes iniciales (de errorapi.txt) y estado
+
+2.1 Credenciales/secretos por defecto
+- Estado: mitigado en prod/cloud.
+- Evidencia: backend/config.py valida seguridad y falla startup si:
+  - API_JWT_SECRET es default/debil
+  - API_ADMIN_PASSWORD es default/debil
+
+2.2 Quality gate de release
+- Estado: resuelto.
+- Evidencia: .github/workflows/release.yml ahora ejecuta:
+  - ruff check .
+  - pytest -q
+  - stub health local para test_api_health
+
+2.3 Documentacion de seguridad faltante
+- Estado: resuelto.
+- Evidencia: docs/PROD_SECURITY_CHECKLIST.md existe y esta referenciado desde README.
+
+2.4 Doble entrada API confusa
+- Estado: resuelto.
+- Evidencia:
+  - backend/main.py = implementacion real
+  - main.py = wrapper de compatibilidad
+
+2.5 Rate limiting login
+- Estado: resuelto.
+- Evidencia:
+  - backend/config.py: API_LOGIN_RATE_LIMIT_*
+  - backend/main.py: bloqueo por intentos fallidos y respuesta 429
+
+3) Warnings en tests
+- on_event deprecado: resuelto migrando a lifespan en backend/main.py.
+- Warning fastapi.routing (asyncio.iscoroutinefunction): mitigado por filtro en pytest
+  (pyproject.toml) para mantener CI limpio mientras se actualiza stack.
+
+4) Entorno/configuracion
+- Backend ahora usa backend/.env* como fuente de verdad.
+- Scripts alineados:
+  - scripts/bootstrap_instance.py escribe backend/.env.<env>
+  - scripts/check_instance_config.py valida backend/.env.<env>
+- run_api.bat muestra banner de entorno y ejecuta validacion strict + bootstrap fallback.
+
+5) Instalador
+- Inno setup integrado con pagina de configuracion inicial para app_settings.json.
+- Fix aplicado en build script de PowerShell para invocar ISCC correctamente.
+- Fix aplicado en script Inno para campo password (PasswordChar).
+- Nota operativa:
+  - Si instala en Program Files con PrivilegesRequired=lowest => Access denied.
+  - Solucion: usar ruta de usuario o PrivilegesRequired=admin.
+
+6) CI/Releases
+- Error de release por health test (WinError 10061) estaba causado por no iniciar servidor;
+  ya corregido agregando stub HTTP antes de pytest en release.yml.
+- Error de lint F401 en main.py ya corregido con __all__ = ["app"].
+
+7) Pendientes operativos antes de salida cloud
+- Ejecutar dry-run completo en maquina limpia con BJJVienna-Setup.exe.
+- Confirmar TLS final (verify_tls=true y certificado valido en clientes prod).
+- Confirmar politica de instalacion (user-space vs admin/Program Files).
+- Hacer release tag final y validar artifact publicado en GitHub Releases.
+
+# =====================================================
+
+Resultado
+- A nivel codigo y pipeline, los bloqueantes principales estan cerrados.
+- Quedan validaciones operativas de despliegue/infra para cerrar salida a cloud.

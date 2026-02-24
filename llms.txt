@@ -1,39 +1,51 @@
-BJJ Vienna (Desktop + API)
+BJJ Vienna (Desktop + API) - Current Snapshot
 
 Purpose
 - Desktop app for BJJ academy operations (students, teachers, locations, sessions, attendance, reports).
-- Main stack: Python, Tkinter UI, PostgreSQL.
-- Optional API: FastAPI attendance endpoints.
+- Optional API layer with JWT auth and role-based access for safer deployments.
+- Main runtime stack: Python + Tkinter + PostgreSQL + FastAPI.
+
+Canonical Architecture
+- API implementation is centralized in `backend/main.py`.
+- Root `main.py` is a compatibility wrapper that forwards to `backend.run`.
+- Desktop remains modular under `ui/*.py`.
 
 Tech Stack
-- Python 3.x
-- Tkinter UI modules in `ui/`
+- Python 3.x (release pipeline pinned to 3.11)
+- Tkinter UI
 - PostgreSQL via `psycopg2`
-- FastAPI in `backend/main.py` (root `main.py` is compatibility wrapper)
+- FastAPI + Uvicorn
+- PyJWT
 - i18n JSON files in `i18n/`
 
+Security/Runtime Highlights
+- Login rate limiting is enabled in API (`/auth/login` can return 429 on repeated failures).
+- Production/cloud startup validates secrets (`API_JWT_SECRET`, `API_ADMIN_PASSWORD`) and fails fast if weak/default.
+- Backend env source of truth is `backend/.env*` (not root `.env*`).
+
 Important Files
-- `gui.py`: Main desktop entrypoint (tabbed UI).
-- `db.py`: DB connection and SQL execution helper.
-- `ui/*.py`: Feature-specific tabs and forms.
-- `i18n.py`: Localization loader and language persistence.
-- `app_settings.json`: Local app/user config.
-- `ARCHITECTURE.md`: Architecture and data model summary.
-- `requirements.txt`: Python dependencies.
-- `tests/test_validation.py`: Existing tests.
+- `gui.py`: desktop entrypoint.
+- `backend/main.py`: canonical FastAPI app.
+- `backend/run.py`: API runner (`python -m backend.run`).
+- `backend/config.py`: env/config loading and security validation.
+- `main.py`: compatibility wrapper for API startup.
+- `db.py`: desktop DB helper.
+- `api_client.py`: desktop -> API client and token handling.
+- `scripts/bootstrap_instance.py`: bootstrap backend env + client settings.
+- `scripts/check_instance_config.py`: strict config validation.
+- `installer/bjjvienna.iss`: installer definition.
+- `.github/workflows/ci.yml`: CI (3.11 stable + 3.14 experimental).
+- `.github/workflows/release.yml`: release workflow with lint/test quality gate.
+- `docs/PROD_SECURITY_CHECKLIST.md`: production checklist.
 
 Run / Test
-- Desktop app: `python gui.py`
-- API: `python -m backend.run` (recommended) or `python main.py` (compatibility)
+- Desktop: `python gui.py`
+- API (recommended): `python -m backend.run`
+- API (compat): `python main.py`
 - Tests: `pytest -q`
 
-Project Conventions
-- Keep UI logic in `ui/` modules; avoid mixing unrelated concerns.
-- Reuse `db.py` data access utilities for SQL operations.
-- Preserve i18n keys and update `i18n/en.json` and `i18n/de-AT.json` together when adding UI text.
-- Avoid committing secrets; use `.env*` and credential manager patterns already in place.
-
-Agent Notes
-- Read `ARCHITECTURE.md` before larger refactors.
-- Prefer small, targeted changes and keep behavior backward-compatible.
-- If touching reports/export behavior, verify CSV/PDF/Excel flows.
+Conventions
+- Keep changes small and behavior-compatible unless explicitly requested.
+- Keep UI text changes synced in both `i18n/en.json` and `i18n/de-AT.json`.
+- Do not commit secrets.
+- If touching reports/export, validate CSV/PDF/Excel flows.
