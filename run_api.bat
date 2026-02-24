@@ -4,7 +4,7 @@ setlocal
 REM Always run from this script's folder.
 cd /d "%~dp0"
 
-if "%APP_ENV%"=="" set "APP_ENV=dev"
+if "%APP_ENV%"=="" set "APP_ENV=prod"
 
 REM Startup banner
 powershell -NoProfile -Command "Write-Host '========================================' -ForegroundColor DarkGray; Write-Host 'TO CHANGE THE ENV CHANGE LINE 7' -ForegroundColor Red; Write-Host ('Using APP_ENV=' + $env:APP_ENV) -ForegroundColor DarkYellow; Write-Host '========================================' -ForegroundColor DarkGray"

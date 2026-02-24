@@ -8,7 +8,6 @@ from api_client import (
     is_api_configured,
     register_attendance as api_register_attendance,
 )
-from db import execute
 from i18n import t
 
 
@@ -34,26 +33,16 @@ def build(tab_attendance):
     # Register a single attendance record for the selected session/student/status.
     def register_attendance():
         try:
-            if is_api_configured():
-                api_register_attendance(
-                    {
-                        "session_id": session_id.get(),
-                        "student_id": student_id.get(),
-                        "status": status.get(),
-                        "source": source.get(),
-                    }
-                )
-            else:
-                execute("""
-                    INSERT INTO t_attendance (session_id, student_id, status, checkin_source)
-                    VALUES (%s,%s,%s,%s)
-                    ON CONFLICT DO NOTHING
-                """, (
-                    session_id.get(),
-                    student_id.get(),
-                    status.get(),
-                    source.get()
-                ))
+            if not is_api_configured():
+                raise ApiError("API is not configured.")
+            api_register_attendance(
+                {
+                    "session_id": session_id.get(),
+                    "student_id": student_id.get(),
+                    "status": status.get(),
+                    "source": source.get(),
+                }
+            )
             messagebox.showinfo("OK", "Attendance registered")
         except ApiError as ae:
             messagebox.showerror("API error", str(ae))
@@ -62,41 +51,30 @@ def build(tab_attendance):
 
     # Load attendance rows for a session id into the table.
     def search_by_session():
-        if is_api_configured():
+        if not is_api_configured():
+            messagebox.showerror("API error", "API is not configured.")
+            rows = []
+        else:
             try:
                 api_rows = api_attendance_by_session(query_value.get())
                 rows = [(r.get("c1"), r.get("c2"), r.get("c3")) for r in api_rows]
             except ApiError as ae:
                 messagebox.showerror("API error", str(ae))
                 rows = []
-        else:
-            rows = execute("""
-                SELECT st.name, a.status, a.checkin_time
-                FROM t_attendance a
-                JOIN t_students st ON a.student_id = st.id
-                WHERE a.session_id = %s
-                ORDER BY st.name
-            """, (query_value.get(),))
         fill_attendance_table(rows)
 
     # Load attendance rows for a student id into the table.
     def search_by_student():
-        if is_api_configured():
+        if not is_api_configured():
+            messagebox.showerror("API error", "API is not configured.")
+            rows = []
+        else:
             try:
                 api_rows = api_attendance_by_student(query_value.get())
                 rows = [(r.get("c1"), r.get("c2"), r.get("c3")) for r in api_rows]
             except ApiError as ae:
                 messagebox.showerror("API error", str(ae))
                 rows = []
-        else:
-            rows = execute("""
-                SELECT c.name, cs.session_date, a.status
-                FROM t_attendance a
-                JOIN t_class_sessions cs ON a.session_id = cs.id
-                JOIN t_classes c ON cs.class_id = c.id
-                WHERE a.student_id = %s
-                ORDER BY cs.session_date DESC
-            """, (query_value.get(),))
         fill_attendance_table(rows)
 
     # Replace the attendance table rows with the provided dataset.
