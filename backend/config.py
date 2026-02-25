@@ -44,6 +44,12 @@ def _get_db_settings() -> dict:
 
 _db = _get_db_settings()
 _database_url = (os.getenv("DATABASE_URL") or "").strip()
+_pg_host = (os.getenv("PGHOST") or "").strip()
+_pg_port = (os.getenv("PGPORT") or "").strip()
+_pg_name = (os.getenv("PGDATABASE") or "").strip()
+_pg_user = (os.getenv("PGUSER") or "").strip()
+_pg_password = (os.getenv("PGPASSWORD") or "").strip()
+_pg_sslmode = (os.getenv("PGSSLMODE") or "").strip()
 
 
 def _db_settings_from_database_url(url: str) -> dict:
@@ -66,12 +72,12 @@ def _db_settings_from_database_url(url: str) -> dict:
 
 _db_url = _db_settings_from_database_url(_database_url)
 
-DB_HOST = os.getenv("DB_HOST", str(_db_url.get("host") or _db.get("host", "localhost")))
-DB_PORT = int(os.getenv("DB_PORT", _db_url.get("port") or _db.get("port", 5432)))
-DB_NAME = os.getenv("DB_NAME", str(_db_url.get("name") or _db.get("name", "")))
-DB_USER = os.getenv("DB_USER", str(_db_url.get("user") or ""))
-DB_PASSWORD = os.getenv("DB_PASSWORD", str(_db_url.get("password") or ""))
-DB_SSLMODE = os.getenv("DB_SSLMODE", str(_db_url.get("sslmode") or _db.get("sslmode", "prefer")))
+DB_HOST = os.getenv("DB_HOST", str(_db_url.get("host") or _pg_host or _db.get("host", "localhost")))
+DB_PORT = int(os.getenv("DB_PORT", _db_url.get("port") or _pg_port or _db.get("port", 5432)))
+DB_NAME = os.getenv("DB_NAME", str(_db_url.get("name") or _pg_name or _db.get("name", "")))
+DB_USER = os.getenv("DB_USER", str(_db_url.get("user") or _pg_user or ""))
+DB_PASSWORD = os.getenv("DB_PASSWORD", str(_db_url.get("password") or _pg_password or ""))
+DB_SSLMODE = os.getenv("DB_SSLMODE", str(_db_url.get("sslmode") or _pg_sslmode or _db.get("sslmode", "prefer")))
 
 _railway_port = os.getenv("PORT")
 API_HOST = os.getenv("API_HOST", "0.0.0.0" if _railway_port else "127.0.0.1")
