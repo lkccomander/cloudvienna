@@ -1,12 +1,24 @@
+import csv
 import json
 import threading
 import time
+import uuid
+from io import StringIO
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi.responses import JSONResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from backend.audit import (
+    audit_log_event,
+    build_request_context,
+    clear_current_request_context,
+    set_current_request_context,
+)
 from backend.config import (
+    API_AUDIT_RETENTION_DAYS,
     API_ADMIN_PASSWORD,
     API_ADMIN_USER,
     API_LOGIN_BLOCK_SECONDS,
@@ -17,6 +29,9 @@ from backend.config import (
 )
 from backend.db import execute, execute_returning_one, fetch_all, fetch_one
 from backend.schemas import (
+    AuditLogRow,
+    AuditLogPurgeOut,
+    AuditLogSearchOut,
     ApiUserPasswordResetIn,
     ApiUserUpdateIn,
     ApiUserBatchCreateIn,
@@ -291,6 +306,27 @@ def _run_startup_migrations():
         )
         """
     )
+    execute(
+        """
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id bigserial PRIMARY KEY,
+            actor_user_id integer REFERENCES t_api_users(id) ON DELETE SET NULL,
+            actor_username varchar(60),
+            action varchar(80) NOT NULL,
+            resource_type varchar(80),
+            resource_id varchar(120),
+            result varchar(20) NOT NULL,
+            ip_address varchar(64),
+            correlation_id varchar(120),
+            details jsonb NOT NULL DEFAULT '{}'::jsonb,
+            created_at timestamp NOT NULL DEFAULT now()
+        )
+        """
+    )
+    execute("CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log (created_at DESC)")
+    execute("CREATE INDEX IF NOT EXISTS idx_audit_log_actor_user_id ON audit_log (actor_user_id)")
+    execute("CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log (action)")
+    execute("CREATE INDEX IF NOT EXISTS idx_audit_log_resource_type ON audit_log (resource_type)")
 
 
 @asynccontextmanager
@@ -300,6 +336,22 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="BJJ Vienna API", version="0.1.0", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def correlation_middleware(request: Request, call_next):
+    incoming = request.headers.get("x-correlation-id") or request.headers.get("x-request-id")
+    correlation_id = (incoming or f"req_{uuid.uuid4().hex}").strip()
+    ip_address = request.client.host if request.client else "unknown"
+    request.state.correlation_id = correlation_id
+    request.state.ip_address = ip_address
+    set_current_request_context(correlation_id=correlation_id, ip_address=ip_address)
+    try:
+        response = await call_next(request)
+    finally:
+        clear_current_request_context()
+    response.headers["X-Correlation-ID"] = correlation_id
+    return response
 
 
 @app.get("/")
@@ -374,6 +426,98 @@ def _require_update_access(subject: str = Depends(_require_auth)) -> str:
             detail="Update permission required",
         )
     return subject
+
+
+def _audit_cud(
+    *,
+    subject: str,
+    action: str,
+    resource_type: str,
+    resource_id: str | int | None = None,
+    details: dict | None = None,
+) -> None:
+    try:
+        actor = _get_user_by_subject(subject)
+    except HTTPException:
+        actor = None
+    audit_log_event(
+        action=action,
+        result="success",
+        actor_user_id=actor.get("id") if actor else None,
+        actor_username=actor.get("username") if actor else subject,
+        resource_type=resource_type,
+        resource_id=str(resource_id) if resource_id is not None else None,
+        details=details or {},
+    )
+
+
+def _build_audit_where(
+    *,
+    date_from: str | None,
+    date_to: str | None,
+    actor_username: str,
+    action: str,
+    resource_type: str,
+    result: str,
+) -> tuple[str, list[object]]:
+    where_clauses = []
+    params: list[object] = []
+
+    if date_from:
+        where_clauses.append("created_at >= %s")
+        params.append(date_from)
+    if date_to:
+        where_clauses.append("created_at <= %s")
+        params.append(date_to)
+
+    username_term = actor_username.strip()
+    if username_term:
+        where_clauses.append("actor_username ILIKE %s")
+        params.append(f"%{username_term}%")
+
+    action_term = action.strip()
+    if action_term:
+        where_clauses.append("action ILIKE %s")
+        params.append(f"%{action_term}%")
+
+    resource_type_term = resource_type.strip()
+    if resource_type_term:
+        where_clauses.append("resource_type ILIKE %s")
+        params.append(f"%{resource_type_term}%")
+
+    result_term = result.strip()
+    if result_term:
+        where_clauses.append("result ILIKE %s")
+        params.append(f"%{result_term}%")
+
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    return where_sql, params
+
+
+def _fetch_audit_total(where_sql: str, params: list[object]) -> int:
+    count_row = fetch_all(
+        f"""
+        SELECT COUNT(*) AS total
+        FROM audit_log
+        {where_sql}
+        """,
+        tuple(params),
+    )[0]
+    return int(count_row["total"])
+
+
+def _fetch_audit_rows(where_sql: str, params: list[object], limit: int, offset: int):
+    return fetch_all(
+        f"""
+        SELECT id, actor_user_id, actor_username, action, resource_type, resource_id, result,
+               ip_address, correlation_id, details, created_at
+        FROM audit_log
+        {where_sql}
+        ORDER BY created_at DESC
+        LIMIT %s OFFSET %s
+        """,
+        tuple(params + [limit, offset]),
+    )
 
 
 def _build_reports_student_filters(payload: ReportsStudentSearchIn):
@@ -500,14 +644,25 @@ def reports_students_export(payload: ReportsStudentSearchIn, _: str = Depends(_r
 def login(payload: LoginRequest, request: Request):
     username = payload.username.strip()
     identity = _login_identity(username, request)
+    ctx = build_request_context(request)
     if _is_login_blocked(identity):
+        audit_log_event(
+            action="auth.login",
+            result="blocked",
+            actor_username=username,
+            resource_type="auth",
+            resource_id=username,
+            ip_address=ctx["ip_address"],
+            correlation_id=ctx["correlation_id"],
+            details={"reason": "rate_limit"},
+        )
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many failed login attempts. Try again later.",
         )
     row = fetch_one(
         """
-        SELECT username, password_hash, active
+        SELECT id, username, password_hash, active
                , role
         FROM t_api_users
         WHERE username = %s
@@ -516,24 +671,67 @@ def login(payload: LoginRequest, request: Request):
     )
     if not row:
         _record_failed_login(identity)
+        audit_log_event(
+            action="auth.login",
+            result="failed",
+            actor_username=username,
+            resource_type="auth",
+            resource_id=username,
+            ip_address=ctx["ip_address"],
+            correlation_id=ctx["correlation_id"],
+            details={"reason": "invalid_credentials"},
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
     if not row.get("active"):
         _record_failed_login(identity)
+        audit_log_event(
+            action="auth.login",
+            result="failed",
+            actor_user_id=row.get("id"),
+            actor_username=row["username"],
+            resource_type="auth",
+            resource_id=row["username"],
+            ip_address=ctx["ip_address"],
+            correlation_id=ctx["correlation_id"],
+            details={"reason": "inactive_user"},
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Inactive user",
         )
     if not verify_password(payload.password, row["password_hash"]):
         _record_failed_login(identity)
+        audit_log_event(
+            action="auth.login",
+            result="failed",
+            actor_user_id=row.get("id"),
+            actor_username=row["username"],
+            resource_type="auth",
+            resource_id=row["username"],
+            ip_address=ctx["ip_address"],
+            correlation_id=ctx["correlation_id"],
+            details={"reason": "invalid_credentials"},
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
     _clear_failed_logins(identity)
     token = create_access_token(subject=row["username"])
+    audit_log_event(
+        action="auth.login",
+        result="success",
+        actor_user_id=row.get("id"),
+        actor_username=row["username"],
+        resource_type="auth",
+        resource_id=row["username"],
+        ip_address=ctx["ip_address"],
+        correlation_id=ctx["correlation_id"],
+        details={"role": row["role"]},
+    )
     return TokenResponse(
         access_token=token,
         expires_in_minutes=API_TOKEN_MINUTES,
@@ -621,8 +819,174 @@ def list_users(_: str = Depends(_require_admin)):
     return [ApiUserOut.model_validate(row) for row in rows]
 
 
+@app.get("/audit/logs", response_model=AuditLogSearchOut)
+def list_audit_logs(
+    subject: str = Depends(_require_admin),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+    actor_username: str = Query(default=""),
+    action: str = Query(default=""),
+    resource_type: str = Query(default=""),
+    result: str = Query(default=""),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+):
+    # keep `subject` explicit so this endpoint is always protected by admin auth
+    _ = subject
+    where_sql, params = _build_audit_where(
+        date_from=date_from,
+        date_to=date_to,
+        actor_username=actor_username,
+        action=action,
+        resource_type=resource_type,
+        result=result,
+    )
+    total = _fetch_audit_total(where_sql, params)
+    rows = _fetch_audit_rows(where_sql, params, limit, offset)
+    return AuditLogSearchOut(
+        total=total,
+        rows=[AuditLogRow.model_validate(row) for row in rows],
+    )
+
+
+@app.get("/audit/logs/export")
+def export_audit_logs(
+    subject: str = Depends(_require_admin),
+    format: str = Query(default="csv"),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+    actor_username: str = Query(default=""),
+    action: str = Query(default=""),
+    resource_type: str = Query(default=""),
+    result: str = Query(default=""),
+    limit: int = Query(default=500, ge=1, le=5000),
+    offset: int = Query(default=0, ge=0),
+):
+    _ = subject
+    output_format = format.strip().lower()
+    if output_format not in {"csv", "json"}:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="format must be csv or json")
+
+    where_sql, params = _build_audit_where(
+        date_from=date_from,
+        date_to=date_to,
+        actor_username=actor_username,
+        action=action,
+        resource_type=resource_type,
+        result=result,
+    )
+    total = _fetch_audit_total(where_sql, params)
+    rows = _fetch_audit_rows(where_sql, params, limit, offset)
+
+    if output_format == "json":
+        payload = {
+            "total": total,
+            "rows": [AuditLogRow.model_validate(row).model_dump(mode="json") for row in rows],
+        }
+        return JSONResponse(content=payload)
+
+    buffer = StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        [
+            "id",
+            "actor_user_id",
+            "actor_username",
+            "action",
+            "resource_type",
+            "resource_id",
+            "result",
+            "ip_address",
+            "correlation_id",
+            "details",
+            "created_at",
+        ]
+    )
+    for row in rows:
+        created_at = row.get("created_at")
+        if isinstance(created_at, datetime):
+            created_at = created_at.isoformat()
+        details = row.get("details")
+        writer.writerow(
+            [
+                row.get("id"),
+                row.get("actor_user_id"),
+                row.get("actor_username"),
+                row.get("action"),
+                row.get("resource_type"),
+                row.get("resource_id"),
+                row.get("result"),
+                row.get("ip_address"),
+                row.get("correlation_id"),
+                json.dumps(details or {}, ensure_ascii=True),
+                created_at,
+            ]
+        )
+    filename = f"audit_log_export_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.post("/audit/logs/purge", response_model=AuditLogPurgeOut)
+def purge_audit_logs(
+    subject: str = Depends(_require_admin),
+    retention_days: int = Query(default=API_AUDIT_RETENTION_DAYS, ge=1, le=3650),
+    dry_run: bool = Query(default=True),
+):
+    actor = _get_user_by_subject(subject)
+    preview = fetch_one(
+        """
+        SELECT COUNT(*)::int AS to_delete
+        FROM audit_log
+        WHERE created_at < now() - (%s * interval '1 day')
+        """,
+        (retention_days,),
+    ) or {"to_delete": 0}
+    to_delete = int(preview.get("to_delete") or 0)
+
+    deleted = 0
+    action = "audit.purge.preview" if dry_run else "audit.purge"
+    if not dry_run:
+        deleted_row = execute_returning_one(
+            """
+            WITH deleted AS (
+                DELETE FROM audit_log
+                WHERE created_at < now() - (%s * interval '1 day')
+                RETURNING id
+            )
+            SELECT COUNT(*)::int AS deleted_count
+            FROM deleted
+            """,
+            (retention_days,),
+        ) or {"deleted_count": 0}
+        deleted = int(deleted_row.get("deleted_count") or 0)
+
+    audit_log_event(
+        action=action,
+        result="success",
+        actor_user_id=actor.get("id"),
+        actor_username=actor.get("username"),
+        resource_type="audit_log",
+        details={
+            "retention_days": retention_days,
+            "dry_run": dry_run,
+            "to_delete": to_delete,
+            "deleted": deleted,
+        },
+    )
+    return AuditLogPurgeOut(
+        dry_run=dry_run,
+        retention_days=retention_days,
+        to_delete=to_delete,
+        deleted=deleted,
+    )
+
+
 @app.post("/users/create", response_model=ApiUserOut, status_code=201)
-def create_user(payload: ApiUserCreateIn, _: str = Depends(_require_admin)):
+def create_user(payload: ApiUserCreateIn, subject: str = Depends(_require_admin)):
     username = payload.username.strip()
     existing = fetch_one(
         "SELECT id FROM t_api_users WHERE username = %s",
@@ -644,13 +1008,20 @@ def create_user(payload: ApiUserCreateIn, _: str = Depends(_require_admin)):
             payload.can_update,
         ),
     )
+    _audit_cud(
+        subject=subject,
+        action="users.create",
+        resource_type="user",
+        resource_id=row["id"],
+        details={"username": row["username"], "role": row["role"]},
+    )
     return ApiUserOut.model_validate(row)
 
 
 @app.post("/users/batch-create", response_model=ApiUserBatchCreateOut)
 def batch_create_users(
     payload: ApiUserBatchCreateIn,
-    _: str = Depends(_require_admin),
+    subject: str = Depends(_require_admin),
     dry_run: bool = Query(default=False),
 ):
     raw_usernames = [item.username.strip() for item in payload.users]
@@ -732,6 +1103,18 @@ def batch_create_users(
                 )
             )
 
+    _audit_cud(
+        subject=subject,
+        action="users.batch_create",
+        resource_type="user",
+        details={
+            "dry_run": dry_run,
+            "total": len(payload.users),
+            "created": created,
+            "skipped": skipped,
+            "errors": errors,
+        },
+    )
     return ApiUserBatchCreateOut(
         dry_run=dry_run,
         total=len(payload.users),
@@ -743,7 +1126,7 @@ def batch_create_users(
 
 
 @app.put("/users/{user_id}", response_model=ApiUserOut)
-def update_user(user_id: int, payload: ApiUserUpdateIn, _: str = Depends(_require_admin)):
+def update_user(user_id: int, payload: ApiUserUpdateIn, subject: str = Depends(_require_admin)):
     existing = fetch_one(
         """
         SELECT id, username, role, can_write, can_update, active, created_at
@@ -803,6 +1186,13 @@ def update_user(user_id: int, payload: ApiUserUpdateIn, _: str = Depends(_requir
             """,
             (username, role, can_write, can_update, active, user_id),
         )
+    _audit_cud(
+        subject=subject,
+        action="users.update",
+        resource_type="user",
+        resource_id=user_id,
+        details={"username": row["username"], "role": row["role"], "active": row["active"]},
+    )
     return ApiUserOut.model_validate(row)
 
 
@@ -810,7 +1200,7 @@ def update_user(user_id: int, payload: ApiUserUpdateIn, _: str = Depends(_requir
 def reset_user_password(
     user_id: int,
     payload: ApiUserPasswordResetIn,
-    _: str = Depends(_require_admin),
+    subject: str = Depends(_require_admin),
 ):
     row = execute_returning_one(
         """
@@ -824,6 +1214,13 @@ def reset_user_password(
     )
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    _audit_cud(
+        subject=subject,
+        action="users.update_password",
+        resource_type="user",
+        resource_id=row["id"],
+        details={"password_changed": True},
+    )
     return {"status": "ok", "id": row["id"]}
 
 
@@ -918,7 +1315,7 @@ def list_locations(_: str = Depends(_require_auth)):
 
 
 @app.post("/locations/create", response_model=LocationCreateResponse, status_code=201)
-def create_location(payload: LocationIn, _: str = Depends(_require_write_access)):
+def create_location(payload: LocationIn, subject: str = Depends(_require_write_access)):
     row = execute_returning_one(
         """
         INSERT INTO t_locations (name, phone, address)
@@ -931,11 +1328,22 @@ def create_location(payload: LocationIn, _: str = Depends(_require_write_access)
             payload.address.strip() if payload.address else None,
         ),
     )
+    _audit_cud(
+        subject=subject,
+        action="locations.create",
+        resource_type="location",
+        resource_id=row["id"],
+        details={"name": payload.name.strip()},
+    )
     return LocationCreateResponse.model_validate(row)
 
 
 @app.put("/locations/{location_id}", response_model=LocationCreateResponse)
-def update_location(location_id: int, payload: LocationIn, _: str = Depends(_require_update_access)):
+def update_location(
+    location_id: int,
+    payload: LocationIn,
+    subject: str = Depends(_require_update_access),
+):
     row = execute_returning_one(
         """
         UPDATE t_locations
@@ -952,11 +1360,18 @@ def update_location(location_id: int, payload: LocationIn, _: str = Depends(_req
     )
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
+    _audit_cud(
+        subject=subject,
+        action="locations.update",
+        resource_type="location",
+        resource_id=location_id,
+        details={"name": payload.name.strip()},
+    )
     return LocationCreateResponse.model_validate(row)
 
 
 @app.post("/locations/{location_id}/deactivate")
-def deactivate_location(location_id: int, _: str = Depends(_require_update_access)):
+def deactivate_location(location_id: int, subject: str = Depends(_require_update_access)):
     row = execute_returning_one(
         """
         UPDATE t_locations SET active=false, updated_at=now()
@@ -967,11 +1382,18 @@ def deactivate_location(location_id: int, _: str = Depends(_require_update_acces
     )
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
+    _audit_cud(
+        subject=subject,
+        action="locations.deactivate",
+        resource_type="location",
+        resource_id=row["id"],
+        details={"active": False},
+    )
     return {"status": "ok", "id": row["id"], "active": False}
 
 
 @app.post("/locations/{location_id}/reactivate")
-def reactivate_location(location_id: int, _: str = Depends(_require_update_access)):
+def reactivate_location(location_id: int, subject: str = Depends(_require_update_access)):
     row = execute_returning_one(
         """
         UPDATE t_locations SET active=true, updated_at=now()
@@ -982,6 +1404,13 @@ def reactivate_location(location_id: int, _: str = Depends(_require_update_acces
     )
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
+    _audit_cud(
+        subject=subject,
+        action="locations.reactivate",
+        resource_type="location",
+        resource_id=row["id"],
+        details={"active": True},
+    )
     return {"status": "ok", "id": row["id"], "active": True}
 
 
@@ -1011,7 +1440,7 @@ def active_teachers(_: str = Depends(_require_auth)):
 
 
 @app.post("/teachers/create", response_model=TeacherCreateResponse, status_code=201)
-def create_teacher(payload: TeacherIn, _: str = Depends(_require_write_access)):
+def create_teacher(payload: TeacherIn, subject: str = Depends(_require_write_access)):
     row = execute_returning_one(
         """
         INSERT INTO public.t_coaches (name, sex, email, phone, belt, hire_date)
@@ -1027,11 +1456,22 @@ def create_teacher(payload: TeacherIn, _: str = Depends(_require_write_access)):
             payload.hire_date,
         ),
     )
+    _audit_cud(
+        subject=subject,
+        action="teachers.create",
+        resource_type="teacher",
+        resource_id=row["id"],
+        details={"name": payload.name.strip()},
+    )
     return TeacherCreateResponse.model_validate(row)
 
 
 @app.put("/teachers/{teacher_id}", response_model=TeacherCreateResponse)
-def update_teacher(teacher_id: int, payload: TeacherIn, _: str = Depends(_require_update_access)):
+def update_teacher(
+    teacher_id: int,
+    payload: TeacherIn,
+    subject: str = Depends(_require_update_access),
+):
     row = execute_returning_one(
         """
         UPDATE public.t_coaches
@@ -1051,11 +1491,18 @@ def update_teacher(teacher_id: int, payload: TeacherIn, _: str = Depends(_requir
     )
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+    _audit_cud(
+        subject=subject,
+        action="teachers.update",
+        resource_type="teacher",
+        resource_id=teacher_id,
+        details={"name": payload.name.strip()},
+    )
     return TeacherCreateResponse.model_validate(row)
 
 
 @app.post("/teachers/{teacher_id}/deactivate")
-def deactivate_teacher(teacher_id: int, _: str = Depends(_require_update_access)):
+def deactivate_teacher(teacher_id: int, subject: str = Depends(_require_update_access)):
     row = execute_returning_one(
         """
         UPDATE public.t_coaches
@@ -1067,11 +1514,18 @@ def deactivate_teacher(teacher_id: int, _: str = Depends(_require_update_access)
     )
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+    _audit_cud(
+        subject=subject,
+        action="teachers.deactivate",
+        resource_type="teacher",
+        resource_id=row["id"],
+        details={"active": False},
+    )
     return {"status": "ok", "id": row["id"], "active": False}
 
 
 @app.post("/teachers/{teacher_id}/reactivate")
-def reactivate_teacher(teacher_id: int, _: str = Depends(_require_update_access)):
+def reactivate_teacher(teacher_id: int, subject: str = Depends(_require_update_access)):
     row = execute_returning_one(
         """
         UPDATE public.t_coaches
@@ -1083,6 +1537,13 @@ def reactivate_teacher(teacher_id: int, _: str = Depends(_require_update_access)
     )
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+    _audit_cud(
+        subject=subject,
+        action="teachers.reactivate",
+        resource_type="teacher",
+        resource_id=row["id"],
+        details={"active": True},
+    )
     return {"status": "ok", "id": row["id"], "active": True}
 
 
@@ -1179,7 +1640,7 @@ def list_sessions(_: str = Depends(_require_auth)):
 
 
 @app.post("/sessions/create", response_model=IdNameOut, status_code=201)
-def create_session(payload: SessionIn, _: str = Depends(_require_write_access)):
+def create_session(payload: SessionIn, subject: str = Depends(_require_write_access)):
     row = execute_returning_one(
         """
         INSERT INTO t_class_sessions (class_id, session_date, start_time, end_time, location_id)
@@ -1194,11 +1655,22 @@ def create_session(payload: SessionIn, _: str = Depends(_require_write_access)):
             payload.location_id,
         ),
     )
+    _audit_cud(
+        subject=subject,
+        action="sessions.create",
+        resource_type="session",
+        resource_id=row["id"],
+        details={"class_id": payload.class_id, "location_id": payload.location_id},
+    )
     return IdNameOut.model_validate(row)
 
 
 @app.put("/sessions/{session_id}", response_model=IdNameOut)
-def update_session(session_id: int, payload: SessionIn, _: str = Depends(_require_update_access)):
+def update_session(
+    session_id: int,
+    payload: SessionIn,
+    subject: str = Depends(_require_update_access),
+):
     row = execute_returning_one(
         """
         UPDATE t_class_sessions
@@ -1217,28 +1689,49 @@ def update_session(session_id: int, payload: SessionIn, _: str = Depends(_requir
     )
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    _audit_cud(
+        subject=subject,
+        action="sessions.update",
+        resource_type="session",
+        resource_id=session_id,
+        details={"class_id": payload.class_id, "location_id": payload.location_id},
+    )
     return IdNameOut.model_validate(row)
 
 
 @app.post("/sessions/{session_id}/cancel")
-def cancel_session(session_id: int, _: str = Depends(_require_update_access)):
+def cancel_session(session_id: int, subject: str = Depends(_require_update_access)):
     row = execute_returning_one(
         "UPDATE t_class_sessions SET cancelled=true WHERE id=%s RETURNING id",
         (session_id,),
     )
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    _audit_cud(
+        subject=subject,
+        action="sessions.cancel",
+        resource_type="session",
+        resource_id=row["id"],
+        details={"cancelled": True},
+    )
     return {"status": "ok", "id": row["id"], "cancelled": True}
 
 
 @app.post("/sessions/{session_id}/restore")
-def restore_session(session_id: int, _: str = Depends(_require_update_access)):
+def restore_session(session_id: int, subject: str = Depends(_require_update_access)):
     row = execute_returning_one(
         "UPDATE t_class_sessions SET cancelled=false WHERE id=%s RETURNING id",
         (session_id,),
     )
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    _audit_cud(
+        subject=subject,
+        action="sessions.restore",
+        resource_type="session",
+        resource_id=row["id"],
+        details={"cancelled": False},
+    )
     return {"status": "ok", "id": row["id"], "cancelled": False}
 
 
@@ -1294,7 +1787,7 @@ def attendance_by_student(student_id: int, _: str = Depends(_require_auth)):
 @app.post("/students/create", response_model=StudentCreateResponse, status_code=201)
 def create_student(
     payload: StudentCreateRequest,
-    _: str = Depends(_require_write_access),
+    subject: str = Depends(_require_write_access),
 ):
     sex = _normalize_sex(payload.sex)
     row = execute_returning_one(
@@ -1331,13 +1824,20 @@ def create_student(
             payload.guardian_relationship,
         ),
     )
+    _audit_cud(
+        subject=subject,
+        action="students.create",
+        resource_type="student",
+        resource_id=row["id"],
+        details={"name": payload.name.strip(), "is_minor": payload.is_minor},
+    )
     return StudentCreateResponse.model_validate(row)
 
 
 @app.post("/students/batch-create", response_model=StudentBatchCreateOut)
 def batch_create_students(
     payload: StudentBatchCreateIn,
-    _: str = Depends(_require_write_access),
+    subject: str = Depends(_require_write_access),
     dry_run: bool = Query(default=False),
 ):
     created = 0
@@ -1417,6 +1917,17 @@ def batch_create_students(
                 )
             )
 
+    _audit_cud(
+        subject=subject,
+        action="students.batch_create",
+        resource_type="student",
+        details={
+            "dry_run": dry_run,
+            "total": len(payload.students),
+            "created": created,
+            "errors": errors,
+        },
+    )
     return StudentBatchCreateOut(
         dry_run=dry_run,
         total=len(payload.students),
@@ -1449,7 +1960,7 @@ def get_student(student_id: int, _: str = Depends(_require_auth)):
 def update_student(
     student_id: int,
     payload: StudentUpdateRequest,
-    _: str = Depends(_require_update_access),
+    subject: str = Depends(_require_update_access),
 ):
     sex = _normalize_sex(payload.sex)
     row = execute_returning_one(
@@ -1488,11 +1999,18 @@ def update_student(
     )
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+    _audit_cud(
+        subject=subject,
+        action="students.update",
+        resource_type="student",
+        resource_id=student_id,
+        details={"name": payload.name.strip(), "is_minor": payload.is_minor},
+    )
     return StudentCreateResponse.model_validate(row)
 
 
 @app.post("/students/{student_id}/deactivate")
-def deactivate_student(student_id: int, _: str = Depends(_require_update_access)):
+def deactivate_student(student_id: int, subject: str = Depends(_require_update_access)):
     row = execute_returning_one(
         """
         UPDATE t_students
@@ -1504,11 +2022,18 @@ def deactivate_student(student_id: int, _: str = Depends(_require_update_access)
     )
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+    _audit_cud(
+        subject=subject,
+        action="students.deactivate",
+        resource_type="student",
+        resource_id=row["id"],
+        details={"active": False},
+    )
     return {"status": "ok", "id": row["id"], "active": False}
 
 
 @app.post("/students/{student_id}/reactivate")
-def reactivate_student(student_id: int, _: str = Depends(_require_update_access)):
+def reactivate_student(student_id: int, subject: str = Depends(_require_update_access)):
     row = execute_returning_one(
         """
         UPDATE t_students
@@ -1520,4 +2045,11 @@ def reactivate_student(student_id: int, _: str = Depends(_require_update_access)
     )
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+    _audit_cud(
+        subject=subject,
+        action="students.reactivate",
+        resource_type="student",
+        resource_id=row["id"],
+        details={"active": True},
+    )
     return {"status": "ok", "id": row["id"], "active": True}

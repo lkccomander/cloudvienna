@@ -354,3 +354,31 @@ class StudentDetailOut(BaseModel):
     created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AuditLogRow(BaseModel):
+    id: int
+    actor_user_id: Optional[int] = None
+    actor_username: Optional[str] = None
+    action: str
+    resource_type: Optional[str] = None
+    resource_id: Optional[str] = None
+    result: str
+    ip_address: Optional[str] = None
+    correlation_id: Optional[str] = None
+    details: dict[str, object] = Field(default_factory=dict)
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AuditLogSearchOut(BaseModel):
+    total: int
+    rows: list[AuditLogRow]
+
+
+class AuditLogPurgeOut(BaseModel):
+    dry_run: bool
+    retention_days: int
+    to_delete: int
+    deleted: int
