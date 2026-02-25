@@ -27,6 +27,7 @@ build/
 .venv-linux/
 docs/
 *.exe
+*.pdf
 
 # IDE
 .vscode/
