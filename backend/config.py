@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+from urllib.parse import urlparse, parse_qs, unquote
 
 from dotenv import load_dotenv
 
@@ -40,16 +41,39 @@ def _get_db_settings() -> dict:
 
 
 _db = _get_db_settings()
+_database_url = (os.getenv("DATABASE_URL") or "").strip()
 
-DB_HOST = os.getenv("DB_HOST", str(_db.get("host", "localhost")))
-DB_PORT = int(os.getenv("DB_PORT", _db.get("port", 5432)))
-DB_NAME = os.getenv("DB_NAME", str(_db.get("name", "")))
-DB_USER = os.getenv("DB_USER", "")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "")
-DB_SSLMODE = os.getenv("DB_SSLMODE", str(_db.get("sslmode", "prefer")))
 
-API_HOST = os.getenv("API_HOST", "127.0.0.1")
-API_PORT = int(os.getenv("API_PORT", "8000"))
+def _db_settings_from_database_url(url: str) -> dict:
+    if not url:
+        return {}
+    parsed = urlparse(url)
+    if not parsed.scheme:
+        return {}
+    query = parse_qs(parsed.query or "")
+    sslmode = (query.get("sslmode") or [None])[0]
+    return {
+        "host": parsed.hostname or "",
+        "port": parsed.port or 5432,
+        "name": (parsed.path or "").lstrip("/"),
+        "user": unquote(parsed.username or ""),
+        "password": unquote(parsed.password or ""),
+        "sslmode": sslmode or "prefer",
+    }
+
+
+_db_url = _db_settings_from_database_url(_database_url)
+
+DB_HOST = os.getenv("DB_HOST", str(_db_url.get("host") or _db.get("host", "localhost")))
+DB_PORT = int(os.getenv("DB_PORT", _db_url.get("port") or _db.get("port", 5432)))
+DB_NAME = os.getenv("DB_NAME", str(_db_url.get("name") or _db.get("name", "")))
+DB_USER = os.getenv("DB_USER", str(_db_url.get("user") or ""))
+DB_PASSWORD = os.getenv("DB_PASSWORD", str(_db_url.get("password") or ""))
+DB_SSLMODE = os.getenv("DB_SSLMODE", str(_db_url.get("sslmode") or _db.get("sslmode", "prefer")))
+
+_railway_port = os.getenv("PORT")
+API_HOST = os.getenv("API_HOST", "0.0.0.0" if _railway_port else "127.0.0.1")
+API_PORT = int(os.getenv("API_PORT", _railway_port or "8000"))
 API_TLS_CERTFILE = os.getenv("API_TLS_CERTFILE", "").strip()
 API_TLS_KEYFILE = os.getenv("API_TLS_KEYFILE", "").strip()
 API_PROXY_HEADERS = os.getenv("API_PROXY_HEADERS", "true").strip().lower() in {"1", "true", "yes", "on"}
