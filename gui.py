@@ -10,7 +10,7 @@ from tkinter import messagebox, ttk
 from api_client import ApiError, clear_session_credentials, is_api_configured, login_with_credentials
 from version import __version__
 from i18n import init_i18n, t
-from ui import about, attendance, locations, news_notifications, reports, sessions, settings, students, teachers, users
+from ui import about, attendance, attendance_week, locations, news_notifications, reports, sessions, settings, students, teachers, users
 
 
 def _run_pre_login_tests() -> bool:
@@ -263,6 +263,7 @@ def main():
         tab_locations = ttk.Frame(notebook, padding=10)
         tab_students = ttk.Frame(notebook, padding=10)
         tab_attendance = ttk.Frame(notebook, padding=10)
+        tab_attendance_week = ttk.Frame(notebook, padding=10)
         tab_sessions = ttk.Frame(notebook, padding=10)
         tab_news = ttk.Frame(notebook, padding=10)
         tab_reports = ttk.Frame(notebook, padding=10)
@@ -274,6 +275,7 @@ def main():
         notebook.add(tab_teachers, text=t("tab.teachers"))
         notebook.add(tab_locations, text=t("tab.locations"))
         notebook.add(tab_attendance, text=t("tab.attendance"))
+        notebook.add(tab_attendance_week, text=t("tab.attendance_week"))
         notebook.add(tab_sessions, text=t("tab.sessions"))
         notebook.add(tab_news, text=t("tab.news_notifications"))
         notebook.add(tab_reports, text=t("tab.reports"))
@@ -305,7 +307,14 @@ def main():
         teachers_api = teachers.build(tab_teachers)
         locations_api = locations.build(tab_locations)
         students_api = students.build(tab_students)
-        attendance.build(tab_attendance)
+        attendance_api = attendance.build(tab_attendance)
+        attendance_week_api = attendance_week.build(
+            tab_attendance_week,
+            on_session_click=lambda row: (
+                notebook.select(tab_attendance),
+                attendance_api["open_for_session"](row.get("id")),
+            ),
+        )
         sessions_api = sessions.build(tab_sessions)
         news_api = news_notifications.build(tab_news)
         reports.build(tab_reports)
@@ -321,6 +330,7 @@ def main():
         sessions_api["refresh_location_options"]()
         sessions_api["load_classes"]()
         sessions_api["load_sessions"]()
+        attendance_week_api["load_week"]()
         news_api["load_birthdays"]()
         if current_user and (current_user.get("role") or "").strip() == "admin":
             users_api["load_users"]()

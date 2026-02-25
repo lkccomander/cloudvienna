@@ -28,6 +28,14 @@ def build(tab_teachers):
     tc_belt = tk.StringVar()
     tc_hire_date = tk.StringVar()
     hire_date_entry = None
+    belt_options = [
+        t("label.belt.white"),
+        t("label.belt.blue"),
+        t("label.belt.purple"),
+        t("label.belt.brown"),
+        t("label.belt.black"),
+        t("label.open"),
+    ]
 
     selected_teacher_id = None
     selected_teacher_active = None
@@ -66,7 +74,7 @@ def build(tab_teachers):
             ttk.Combobox(
                 teachers_form,
                 textvariable=var,
-                values=["Black", "Brown", "Purple"],
+                values=belt_options,
                 state="readonly",
                 width=25
             ).grid(row=i, column=1)

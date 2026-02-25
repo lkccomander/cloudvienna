@@ -198,6 +198,14 @@ def build(tab_students):
     st_guardian_relationship = tk.StringVar()
 
     location_option_map = {}
+    belt_options = [
+        t("label.belt.white"),
+        t("label.belt.blue"),
+        t("label.belt.purple"),
+        t("label.belt.brown"),
+        t("label.belt.black"),
+        t("label.open"),
+    ]
 
     # Populate the location combobox with active locations.
     def refresh_location_options():
@@ -253,7 +261,7 @@ def build(tab_students):
         if lbl == "Belt":
             ttk.Combobox(
                 form, textvariable=var,
-                values=["White", "Blue", "Purple", "Brown", "Black"],
+                values=belt_options,
                 state="readonly", width=25
             ).grid(row=i, column=1)
         elif lbl == "Genre":

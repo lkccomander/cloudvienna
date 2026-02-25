@@ -18,6 +18,8 @@ def build(tab_users):
     us_username = tk.StringVar()
     us_role = tk.StringVar(value="coach")
     us_password = tk.StringVar()
+    us_can_write = tk.BooleanVar(value=True)
+    us_can_update = tk.BooleanVar(value=True)
 
     selected_user_id = None
     selected_user_active = None
@@ -46,8 +48,15 @@ def build(tab_users):
     ttk.Label(users_form, text=t("label.password")).grid(row=2, column=0, sticky="w")
     ttk.Entry(users_form, textvariable=us_password, width=30, show="*").grid(row=2, column=1, sticky="w")
 
+    ttk.Checkbutton(users_form, text=t("label.can_write"), variable=us_can_write).grid(
+        row=3, column=0, columnspan=2, sticky="w"
+    )
+    ttk.Checkbutton(users_form, text=t("label.can_update"), variable=us_can_update).grid(
+        row=4, column=0, columnspan=2, sticky="w"
+    )
+
     btns = ttk.Frame(users_form)
-    btns.grid(row=3, column=0, columnspan=2, pady=10, sticky="w")
+    btns.grid(row=5, column=0, columnspan=2, pady=10, sticky="w")
 
     us_btn_add = ttk.Button(btns, text=t("button.register"))
     us_btn_update = ttk.Button(btns, text=t("button.update"))
@@ -65,18 +74,22 @@ def build(tab_users):
 
     users_tree = ttk.Treeview(
         users_list,
-        columns=("id", "username", "role", "status", "created_at"),
+        columns=("id", "username", "role", "can_write", "can_update", "status", "created_at"),
         show="headings",
     )
     users_tree.heading("id", text=t("label.id"))
     users_tree.heading("username", text=t("label.username"))
     users_tree.heading("role", text=t("label.role"))
+    users_tree.heading("can_write", text=t("label.can_write"))
+    users_tree.heading("can_update", text=t("label.can_update"))
     users_tree.heading("status", text=t("label.status"))
     users_tree.heading("created_at", text=t("label.created_at"))
 
     users_tree.column("id", width=80, anchor="center")
     users_tree.column("username", width=260)
     users_tree.column("role", width=140, anchor="center")
+    users_tree.column("can_write", width=120, anchor="center")
+    users_tree.column("can_update", width=120, anchor="center")
     users_tree.column("status", width=140, anchor="center")
     users_tree.column("created_at", width=220)
 
@@ -114,6 +127,8 @@ def build(tab_users):
         us_username.set("")
         us_role.set("coach")
         us_password.set("")
+        us_can_write.set(True)
+        us_can_update.set(True)
         users_tree.selection_remove(*users_tree.selection())
         _set_button_states()
 
@@ -126,7 +141,7 @@ def build(tab_users):
             rows = []
 
         if not rows:
-            users_tree.insert("", tk.END, values=("", t("label.no_data"), "", "", ""), tags=("inactive",))
+            users_tree.insert("", tk.END, values=("", t("label.no_data"), "", "", "", "", ""), tags=("inactive",))
             _clear_form()
             return
 
@@ -139,6 +154,8 @@ def build(tab_users):
                     row.get("id"),
                     row.get("username"),
                     row.get("role"),
+                    t("label.yes") if row.get("can_write", True) else t("label.no"),
+                    t("label.yes") if row.get("can_update", True) else t("label.no"),
                     t("label.active") if is_active else t("label.inactive"),
                     row.get("created_at"),
                 ),
@@ -159,6 +176,8 @@ def build(tab_users):
         us_username.set(values[1] or "")
         selected_role = values[2] if values[2] in ROLE_OPTIONS else "coach"
         us_role.set(selected_role)
+        us_can_write.set((values[3] or "").strip().lower() == t("label.yes").lower())
+        us_can_update.set((values[4] or "").strip().lower() == t("label.yes").lower())
         us_password.set("")
         selected_user_active = users_tree.item(selected[0]).get("tags", ("inactive",))[0] == "active"
         _set_button_states()
@@ -178,7 +197,15 @@ def build(tab_users):
             messagebox.showerror(t("alert.validation_title"), t("alert.invalid_role"))
             return
         try:
-            create_api_user({"username": username, "password": password, "role": role})
+            create_api_user(
+                {
+                    "username": username,
+                    "password": password,
+                    "role": role,
+                    "can_write": bool(us_can_write.get()),
+                    "can_update": bool(us_can_update.get()),
+                }
+            )
             load_users()
         except ApiError as exc:
             messagebox.showerror(t("alert.api_error_title"), str(exc))
@@ -199,7 +226,12 @@ def build(tab_users):
         if password and len(password) < 10:
             messagebox.showerror(t("alert.validation_title"), t("alert.password_min"))
             return
-        payload = {"username": username, "role": role}
+        payload = {
+            "username": username,
+            "role": role,
+            "can_write": bool(us_can_write.get()),
+            "can_update": bool(us_can_update.get()),
+        }
         if password:
             payload["new_password"] = password
         try:

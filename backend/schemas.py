@@ -23,11 +23,15 @@ class ApiUserCreateIn(BaseModel):
     username: str = Field(min_length=3, max_length=60)
     password: str = Field(min_length=10, max_length=256)
     role: UserRole = "coach"
+    can_write: bool = True
+    can_update: bool = True
 
 
 class ApiUserUpdateIn(BaseModel):
     username: Optional[str] = Field(default=None, min_length=3, max_length=60)
     role: Optional[UserRole] = None
+    can_write: Optional[bool] = None
+    can_update: Optional[bool] = None
     active: Optional[bool] = None
     new_password: Optional[str] = Field(default=None, min_length=10, max_length=256)
 
@@ -40,6 +44,8 @@ class ApiUserOut(BaseModel):
     id: int
     username: str
     role: UserRole
+    can_write: bool = True
+    can_update: bool = True
     active: bool
     created_at: datetime
 
@@ -232,7 +238,7 @@ class IdNameOut(BaseModel):
 class ClassIn(BaseModel):
     name: str = Field(min_length=1, max_length=150)
     belt_level: Optional[str] = None
-    coach_id: int
+    coach_id: Optional[int] = None
     duration_min: int = Field(ge=1)
 
 

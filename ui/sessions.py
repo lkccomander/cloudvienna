@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, colorchooser
 from datetime import date
 
 from tkcalendar import DateEntry
@@ -21,6 +21,12 @@ from api_client import (
     update_session as api_update_session,
 )
 from i18n import t
+from ui.local_app_settings import (
+    DEFAULT_CLASS_COLOR,
+    get_class_color,
+    is_valid_hex_color,
+    set_class_color,
+)
 from validation_middleware import ValidationError, validate_required
 from error_middleware import handle_db_error, log_validation_error
 
@@ -51,12 +57,22 @@ def build(tab_sessions):
     class_belt = tk.StringVar()
     class_duration = tk.StringVar()
     class_coach = tk.StringVar()
+    class_color = tk.StringVar(value=DEFAULT_CLASS_COLOR)
 
     selected_class_id = None
     selected_class_active = None
 
     coach_option_map = {}
     class_option_map = {}
+    none_coach_label = t("label.none")
+    belt_options = [
+        t("label.belt.white"),
+        t("label.belt.blue"),
+        t("label.belt.purple"),
+        t("label.belt.brown"),
+        t("label.belt.black"),
+        t("label.open"),
+    ]
 
     # ---------- Session Variables ----------
     session_class = tk.StringVar()
@@ -89,7 +105,7 @@ def build(tab_sessions):
             ttk.Combobox(
                 classes_form_frame,
                 textvariable=var,
-                values=["White", "Blue", "Purple", "Brown", "Black"],
+                values=belt_options,
                 state="readonly",
                 width=25
             ).grid(row=i, column=1)
@@ -99,8 +115,23 @@ def build(tab_sessions):
         else:
             ttk.Entry(classes_form_frame, textvariable=var, width=30).grid(row=i, column=1)
 
+    color_row = len(class_fields)
+    ttk.Label(classes_form_frame, text=t("label.color")).grid(row=color_row, column=0, sticky="w")
+    color_entry = ttk.Entry(classes_form_frame, textvariable=class_color, width=18)
+    color_entry.grid(row=color_row, column=1, sticky="w")
+
+    def _pick_class_color():
+        current = class_color.get().strip() or DEFAULT_CLASS_COLOR
+        picked = colorchooser.askcolor(color=current)
+        if picked and picked[1]:
+            class_color.set(picked[1])
+
+    ttk.Button(classes_form_frame, text=t("settings.pick"), command=_pick_class_color, width=6).grid(
+        row=color_row, column=2, sticky="w", padx=(6, 0)
+    )
+
     class_btns = ttk.Frame(classes_form_frame)
-    class_btns.grid(row=len(class_fields), column=0, columnspan=2, pady=10)
+    class_btns.grid(row=color_row + 1, column=0, columnspan=3, pady=10)
 
     btn_class_add = ttk.Button(class_btns, text=t("button.add"))
     btn_class_update = ttk.Button(class_btns, text=t("button.update"))
@@ -211,15 +242,17 @@ def build(tab_sessions):
         except ApiError as e:
             messagebox.showerror("API error", str(e))
             rows = []
-        options = []
-        option_map = {}
+        options = [none_coach_label]
+        option_map = {none_coach_label: None}
         for coach_id, name in rows:
             label = f"{name} (#{coach_id})"
             options.append(label)
             option_map[label] = coach_id
         coach_option_map = option_map
         coach_cb["values"] = options
-        if show_empty_message and not options:
+        if not class_coach.get() or class_coach.get() not in option_map:
+            class_coach.set(none_coach_label)
+        if show_empty_message and not rows:
             messagebox.showinfo("No coaches", "No active coaches found. Please add a coach first.")
 
     # Populate the class combobox with active classes from the database.
@@ -363,7 +396,8 @@ def build(tab_sessions):
         class_name.set("")
         class_belt.set("")
         class_duration.set("")
-        class_coach.set("")
+        class_coach.set(none_coach_label)
+        class_color.set(DEFAULT_CLASS_COLOR)
         update_class_button_states()
 
     # Validate and insert a new class, then reload the list.
@@ -380,11 +414,15 @@ def build(tab_sessions):
             except ValueError:
                 raise ValidationError("Duration must be a positive number")
 
-            coach_id = coach_option_map.get(class_coach.get())
-            if not coach_id:
+            selected_coach_label = class_coach.get().strip()
+            if selected_coach_label not in coach_option_map:
                 raise ValidationError("Select a valid coach")
+            coach_id = coach_option_map[selected_coach_label]
+            color_value = class_color.get().strip() or DEFAULT_CLASS_COLOR
+            if not is_valid_hex_color(color_value):
+                raise ValidationError("Color must be a valid hex (e.g. #0d6efd)")
 
-            api_create_class(
+            created = api_create_class(
                 {
                     "name": class_name.get(),
                     "belt_level": class_belt.get(),
@@ -392,6 +430,7 @@ def build(tab_sessions):
                     "duration_min": duration,
                 }
             )
+            set_class_color(created.get("id") if isinstance(created, dict) else None, color_value)
 
             load_classes()
             messagebox.showinfo("OK", "Class created")
@@ -422,9 +461,13 @@ def build(tab_sessions):
             except ValueError:
                 raise ValidationError("Duration must be a positive number")
 
-            coach_id = coach_option_map.get(class_coach.get())
-            if not coach_id:
+            selected_coach_label = class_coach.get().strip()
+            if selected_coach_label not in coach_option_map:
                 raise ValidationError("Select a valid coach")
+            coach_id = coach_option_map[selected_coach_label]
+            color_value = class_color.get().strip() or DEFAULT_CLASS_COLOR
+            if not is_valid_hex_color(color_value):
+                raise ValidationError("Color must be a valid hex (e.g. #0d6efd)")
 
             api_update_class(
                 selected_class_id,
@@ -435,6 +478,7 @@ def build(tab_sessions):
                     "duration_min": duration,
                 },
             )
+            set_class_color(selected_class_id, color_value)
 
             load_classes()
             messagebox.showinfo("OK", "Class updated")
@@ -487,13 +531,14 @@ def build(tab_sessions):
         class_name.set(v[1])
         class_belt.set(v[2])
         class_duration.set(v[4])
+        class_color.set(get_class_color(v[0], DEFAULT_CLASS_COLOR))
 
         coach_label = ""
         for label, coach_id in coach_option_map.items():
             if v[3] and label.startswith(f"{v[3]} ("):
                 coach_label = label
                 break
-        class_coach.set(coach_label)
+        class_coach.set(coach_label or none_coach_label)
 
         update_class_button_states()
 

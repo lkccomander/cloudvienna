@@ -141,6 +141,12 @@ def _run_startup_migrations():
     )
     execute(
         """
+        ALTER TABLE t_classes
+        ALTER COLUMN coach_id DROP NOT NULL
+        """
+    )
+    execute(
+        """
         ALTER TABLE t_students
         ADD COLUMN IF NOT EXISTS location_id integer
         """
@@ -206,6 +212,8 @@ def _run_startup_migrations():
             username varchar(60) NOT NULL UNIQUE,
             password_hash text NOT NULL,
             role varchar(20) NOT NULL DEFAULT 'coach',
+            can_write boolean NOT NULL DEFAULT true,
+            can_update boolean NOT NULL DEFAULT true,
             active boolean NOT NULL DEFAULT true,
             created_at timestamp NOT NULL DEFAULT now(),
             updated_at timestamp
@@ -232,6 +240,18 @@ def _run_startup_migrations():
     )
     execute(
         """
+        ALTER TABLE t_api_users
+        ADD COLUMN IF NOT EXISTS can_write boolean NOT NULL DEFAULT true
+        """
+    )
+    execute(
+        """
+        ALTER TABLE t_api_users
+        ADD COLUMN IF NOT EXISTS can_update boolean NOT NULL DEFAULT true
+        """
+    )
+    execute(
+        """
         DO $$
         BEGIN
             ALTER TABLE t_api_users
@@ -249,6 +269,8 @@ def _run_startup_migrations():
         VALUES (%s, %s, 'admin', TRUE)
         ON CONFLICT (username) DO UPDATE
         SET role = 'admin',
+            can_write = TRUE,
+            can_update = TRUE,
             active = TRUE,
             updated_at = now()
         """,
@@ -312,7 +334,7 @@ def _require_auth(
 def _get_user_by_subject(subject: str):
     row = fetch_one(
         """
-        SELECT id, username, role, active
+        SELECT id, username, role, can_write, can_update, active
         FROM t_api_users
         WHERE username = %s
         """,
@@ -332,10 +354,24 @@ def _require_admin(subject: str = Depends(_require_auth)) -> str:
 
 def _require_write_access(subject: str = Depends(_require_auth)) -> str:
     row = _get_user_by_subject(subject)
-    if row.get("role") not in ("admin", "coach"):
+    if row.get("role") == "admin":
+        return subject
+    if not bool(row.get("can_write")):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Write role required",
+            detail="Write permission required",
+        )
+    return subject
+
+
+def _require_update_access(subject: str = Depends(_require_auth)) -> str:
+    row = _get_user_by_subject(subject)
+    if row.get("role") == "admin":
+        return subject
+    if not bool(row.get("can_update")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Update permission required",
         )
     return subject
 
@@ -577,7 +613,7 @@ def upsert_my_preferences(
 def list_users(_: str = Depends(_require_admin)):
     rows = fetch_all(
         """
-        SELECT id, username, role, active, created_at
+        SELECT id, username, role, can_write, can_update, active, created_at
         FROM t_api_users
         ORDER BY username
         """
@@ -596,11 +632,17 @@ def create_user(payload: ApiUserCreateIn, _: str = Depends(_require_admin)):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
     row = execute_returning_one(
         """
-        INSERT INTO t_api_users (username, password_hash, role, active)
-        VALUES (%s, %s, %s, TRUE)
-        RETURNING id, username, role, active, created_at
+        INSERT INTO t_api_users (username, password_hash, role, can_write, can_update, active)
+        VALUES (%s, %s, %s, %s, %s, TRUE)
+        RETURNING id, username, role, can_write, can_update, active, created_at
         """,
-        (username, hash_password(payload.password), payload.role),
+        (
+            username,
+            hash_password(payload.password),
+            payload.role,
+            payload.can_write,
+            payload.can_update,
+        ),
     )
     return ApiUserOut.model_validate(row)
 
@@ -659,11 +701,17 @@ def batch_create_users(
             else:
                 row = execute_returning_one(
                     """
-                    INSERT INTO t_api_users (username, password_hash, role, active)
-                    VALUES (%s, %s, %s, TRUE)
+                    INSERT INTO t_api_users (username, password_hash, role, can_write, can_update, active)
+                    VALUES (%s, %s, %s, %s, %s, TRUE)
                     RETURNING id
                     """,
-                    (username, hash_password(item.password), item.role),
+                    (
+                        username,
+                        hash_password(item.password),
+                        item.role,
+                        item.can_write,
+                        item.can_update,
+                    ),
                 )
             created += 1
             results.append(
@@ -698,7 +746,7 @@ def batch_create_users(
 def update_user(user_id: int, payload: ApiUserUpdateIn, _: str = Depends(_require_admin)):
     existing = fetch_one(
         """
-        SELECT id, username, role, active, created_at
+        SELECT id, username, role, can_write, can_update, active, created_at
         FROM t_api_users
         WHERE id = %s
         """,
@@ -709,6 +757,8 @@ def update_user(user_id: int, payload: ApiUserUpdateIn, _: str = Depends(_requir
 
     username = payload.username.strip() if payload.username is not None else existing["username"]
     role = payload.role if payload.role is not None else existing["role"]
+    can_write = payload.can_write if payload.can_write is not None else existing["can_write"]
+    can_update = payload.can_update if payload.can_update is not None else existing["can_update"]
     active = payload.active if payload.active is not None else existing["active"]
 
     username_conflict = fetch_one(
@@ -728,13 +778,15 @@ def update_user(user_id: int, payload: ApiUserUpdateIn, _: str = Depends(_requir
             UPDATE t_api_users
             SET username = %s,
                 role = %s,
+                can_write = %s,
+                can_update = %s,
                 active = %s,
                 password_hash = %s,
                 updated_at = now()
             WHERE id = %s
-            RETURNING id, username, role, active, created_at
+            RETURNING id, username, role, can_write, can_update, active, created_at
             """,
-            (username, role, active, hash_password(payload.new_password), user_id),
+            (username, role, can_write, can_update, active, hash_password(payload.new_password), user_id),
         )
     else:
         row = execute_returning_one(
@@ -742,12 +794,14 @@ def update_user(user_id: int, payload: ApiUserUpdateIn, _: str = Depends(_requir
             UPDATE t_api_users
             SET username = %s,
                 role = %s,
+                can_write = %s,
+                can_update = %s,
                 active = %s,
                 updated_at = now()
             WHERE id = %s
-            RETURNING id, username, role, active, created_at
+            RETURNING id, username, role, can_write, can_update, active, created_at
             """,
-            (username, role, active, user_id),
+            (username, role, can_write, can_update, active, user_id),
         )
     return ApiUserOut.model_validate(row)
 
@@ -881,7 +935,7 @@ def create_location(payload: LocationIn, _: str = Depends(_require_write_access)
 
 
 @app.put("/locations/{location_id}", response_model=LocationCreateResponse)
-def update_location(location_id: int, payload: LocationIn, _: str = Depends(_require_write_access)):
+def update_location(location_id: int, payload: LocationIn, _: str = Depends(_require_update_access)):
     row = execute_returning_one(
         """
         UPDATE t_locations
@@ -902,7 +956,7 @@ def update_location(location_id: int, payload: LocationIn, _: str = Depends(_req
 
 
 @app.post("/locations/{location_id}/deactivate")
-def deactivate_location(location_id: int, _: str = Depends(_require_write_access)):
+def deactivate_location(location_id: int, _: str = Depends(_require_update_access)):
     row = execute_returning_one(
         """
         UPDATE t_locations SET active=false, updated_at=now()
@@ -917,7 +971,7 @@ def deactivate_location(location_id: int, _: str = Depends(_require_write_access
 
 
 @app.post("/locations/{location_id}/reactivate")
-def reactivate_location(location_id: int, _: str = Depends(_require_write_access)):
+def reactivate_location(location_id: int, _: str = Depends(_require_update_access)):
     row = execute_returning_one(
         """
         UPDATE t_locations SET active=true, updated_at=now()
@@ -977,7 +1031,7 @@ def create_teacher(payload: TeacherIn, _: str = Depends(_require_write_access)):
 
 
 @app.put("/teachers/{teacher_id}", response_model=TeacherCreateResponse)
-def update_teacher(teacher_id: int, payload: TeacherIn, _: str = Depends(_require_write_access)):
+def update_teacher(teacher_id: int, payload: TeacherIn, _: str = Depends(_require_update_access)):
     row = execute_returning_one(
         """
         UPDATE public.t_coaches
@@ -1001,7 +1055,7 @@ def update_teacher(teacher_id: int, payload: TeacherIn, _: str = Depends(_requir
 
 
 @app.post("/teachers/{teacher_id}/deactivate")
-def deactivate_teacher(teacher_id: int, _: str = Depends(_require_write_access)):
+def deactivate_teacher(teacher_id: int, _: str = Depends(_require_update_access)):
     row = execute_returning_one(
         """
         UPDATE public.t_coaches
@@ -1017,7 +1071,7 @@ def deactivate_teacher(teacher_id: int, _: str = Depends(_require_write_access))
 
 
 @app.post("/teachers/{teacher_id}/reactivate")
-def reactivate_teacher(teacher_id: int, _: str = Depends(_require_write_access)):
+def reactivate_teacher(teacher_id: int, _: str = Depends(_require_update_access)):
     row = execute_returning_one(
         """
         UPDATE public.t_coaches
@@ -1038,7 +1092,7 @@ def list_classes(_: str = Depends(_require_auth)):
         """
         SELECT c.id, c.name, c.belt_level, c.coach_id, c.duration_min, c.active, t.name AS coach_name
         FROM t_classes c
-        JOIN public.t_coaches t ON c.coach_id = t.id
+        LEFT JOIN public.t_coaches t ON c.coach_id = t.id
         ORDER BY c.name
         """
     )
@@ -1072,7 +1126,7 @@ def create_class(payload: ClassIn, _: str = Depends(_require_write_access)):
 
 
 @app.put("/classes/{class_id}", response_model=IdNameOut)
-def update_class(class_id: int, payload: ClassIn, _: str = Depends(_require_write_access)):
+def update_class(class_id: int, payload: ClassIn, _: str = Depends(_require_update_access)):
     row = execute_returning_one(
         """
         UPDATE t_classes
@@ -1088,7 +1142,7 @@ def update_class(class_id: int, payload: ClassIn, _: str = Depends(_require_writ
 
 
 @app.post("/classes/{class_id}/deactivate")
-def deactivate_class(class_id: int, _: str = Depends(_require_write_access)):
+def deactivate_class(class_id: int, _: str = Depends(_require_update_access)):
     row = execute_returning_one(
         "UPDATE t_classes SET active=false WHERE id=%s RETURNING id",
         (class_id,),
@@ -1099,7 +1153,7 @@ def deactivate_class(class_id: int, _: str = Depends(_require_write_access)):
 
 
 @app.post("/classes/{class_id}/reactivate")
-def reactivate_class(class_id: int, _: str = Depends(_require_write_access)):
+def reactivate_class(class_id: int, _: str = Depends(_require_update_access)):
     row = execute_returning_one(
         "UPDATE t_classes SET active=true WHERE id=%s RETURNING id",
         (class_id,),
@@ -1144,7 +1198,7 @@ def create_session(payload: SessionIn, _: str = Depends(_require_write_access)):
 
 
 @app.put("/sessions/{session_id}", response_model=IdNameOut)
-def update_session(session_id: int, payload: SessionIn, _: str = Depends(_require_write_access)):
+def update_session(session_id: int, payload: SessionIn, _: str = Depends(_require_update_access)):
     row = execute_returning_one(
         """
         UPDATE t_class_sessions
@@ -1167,7 +1221,7 @@ def update_session(session_id: int, payload: SessionIn, _: str = Depends(_requir
 
 
 @app.post("/sessions/{session_id}/cancel")
-def cancel_session(session_id: int, _: str = Depends(_require_write_access)):
+def cancel_session(session_id: int, _: str = Depends(_require_update_access)):
     row = execute_returning_one(
         "UPDATE t_class_sessions SET cancelled=true WHERE id=%s RETURNING id",
         (session_id,),
@@ -1178,7 +1232,7 @@ def cancel_session(session_id: int, _: str = Depends(_require_write_access)):
 
 
 @app.post("/sessions/{session_id}/restore")
-def restore_session(session_id: int, _: str = Depends(_require_write_access)):
+def restore_session(session_id: int, _: str = Depends(_require_update_access)):
     row = execute_returning_one(
         "UPDATE t_class_sessions SET cancelled=false WHERE id=%s RETURNING id",
         (session_id,),
@@ -1395,7 +1449,7 @@ def get_student(student_id: int, _: str = Depends(_require_auth)):
 def update_student(
     student_id: int,
     payload: StudentUpdateRequest,
-    _: str = Depends(_require_write_access),
+    _: str = Depends(_require_update_access),
 ):
     sex = _normalize_sex(payload.sex)
     row = execute_returning_one(
@@ -1438,7 +1492,7 @@ def update_student(
 
 
 @app.post("/students/{student_id}/deactivate")
-def deactivate_student(student_id: int, _: str = Depends(_require_write_access)):
+def deactivate_student(student_id: int, _: str = Depends(_require_update_access)):
     row = execute_returning_one(
         """
         UPDATE t_students
@@ -1454,7 +1508,7 @@ def deactivate_student(student_id: int, _: str = Depends(_require_write_access))
 
 
 @app.post("/students/{student_id}/reactivate")
-def reactivate_student(student_id: int, _: str = Depends(_require_write_access)):
+def reactivate_student(student_id: int, _: str = Depends(_require_update_access)):
     row = execute_returning_one(
         """
         UPDATE t_students

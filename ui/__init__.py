@@ -1,5 +1,6 @@
 from . import about
 from . import attendance
+from . import attendance_week
 from . import locations
 from . import news_notifications
 from . import reports
@@ -11,6 +12,7 @@ from . import users
 __all__ = [
     "about",
     "attendance",
+    "attendance_week",
     "locations",
     "news_notifications",
     "reports",
