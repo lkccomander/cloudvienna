@@ -10,6 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 BACKEND_DIR = Path(__file__).resolve().parent
 APP_SETTINGS_PATH = ROOT_DIR / "app_settings.json"
 APP_ENV = os.getenv("APP_ENV", "dev").strip().lower()
+IN_RAILWAY = bool(os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_PROJECT_ID"))
 
 # Backend uses backend-scoped env files as single source of truth.
 _env_variant = {
@@ -21,10 +22,11 @@ ENV_FILE_PRIORITY = [
     BACKEND_DIR / ".env",
     BACKEND_DIR / _env_variant,
 ]
-for env_file in ENV_FILE_PRIORITY:
-    # API runs in project-scoped mode: env files should override machine/user env vars.
-    load_dotenv(env_file, override=True)
-ENV_FILES_PRESENT = [str(path) for path in ENV_FILE_PRIORITY if path.exists()]
+if not IN_RAILWAY:
+    for env_file in ENV_FILE_PRIORITY:
+        # Local/dev mode: env files are the primary source of truth.
+        load_dotenv(env_file, override=True)
+ENV_FILES_PRESENT = [str(path) for path in ENV_FILE_PRIORITY if path.exists()] if not IN_RAILWAY else []
 
 
 def _load_json(path: Path) -> dict:
