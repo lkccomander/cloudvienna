@@ -1,15 +1,19 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
+
+datas = [
+    ('i18n\\*.json', 'i18n'),
+    ('fondo\\*', 'fondo'),
+]
+if os.path.exists('app_settings.json'):
+    datas.append(('app_settings.json', '.'))
 
 a = Analysis(
     ['gui.py'],
     pathex=[],
     binaries=[],
-    datas=[
-        ('i18n\\*.json', 'i18n'),
-        ('app_settings.json', '.'),
-        ('fondo\\*', 'fondo'),
-    ],
+    datas=datas,
     hiddenimports=[
         'keyring',
         'keyring.backends',
