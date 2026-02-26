@@ -4,6 +4,7 @@ import platform
 import re
 import socket
 import subprocess
+import sys
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
@@ -25,8 +26,16 @@ def build(tab_about):
     logo_label.grid(row=0, column=0, sticky="w")
 
     def _settings_path():
+        if getattr(sys, "frozen", False):
+            return os.path.join(os.path.dirname(sys.executable), "app_settings.json")
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         return os.path.join(base_dir, "app_settings.json")
+
+    def _resource_path(*parts):
+        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+            return os.path.join(sys._MEIPASS, *parts)
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(base_dir, *parts)
 
     def _load_settings():
         try:
@@ -73,7 +82,11 @@ def build(tab_about):
     logo_frame.columnconfigure(0, weight=1)
 
     settings = _load_settings()
-    _load_logo(settings.get("logo_path"))
+    logo_path = settings.get("logo_path")
+    if logo_path and os.path.exists(logo_path):
+        _load_logo(logo_path)
+    else:
+        _load_logo(_resource_path("fondo", "logo2.jpg"))
 
     about_frame = ttk.LabelFrame(tab_about, text=t("label.system_config"), padding=10)
     about_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=(10, 6))

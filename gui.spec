@@ -8,6 +8,7 @@ a = Analysis(
     datas=[
         ('i18n\\*.json', 'i18n'),
         ('app_settings.json', '.'),
+        ('fondo\\*', 'fondo'),
     ],
     hiddenimports=[
         'keyring',
@@ -43,4 +44,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='fondo\\logo1.ico',
 )

@@ -13,6 +13,12 @@ from i18n import init_i18n, t
 from ui import about, attendance, attendance_week, locations, news_notifications, reports, sessions, settings, students, teachers, users
 
 
+def _resource_path(*parts: str) -> str:
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, *parts)
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), *parts)
+
+
 def _run_pre_login_tests() -> bool:
     enabled = os.getenv("APP_PRELOGIN_TESTS", "").strip().lower() in {"1", "true", "yes", "on"}
     if not enabled:
@@ -88,11 +94,17 @@ def _run_pre_login_tests() -> bool:
 
 
 def _resolve_login_bg_path() -> str:
-    preferred = r"C:\Projects\bjjvienna\fondo\f1.png"
-    if os.path.exists(preferred):
-        return preferred
-    local = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fondo", "f1.png")
-    return local
+    bundled = _resource_path("fondo", "f1.png")
+    if os.path.exists(bundled):
+        return bundled
+    legacy = r"C:\Projects\bjjvienna\fondo\f1.png"
+    if os.path.exists(legacy):
+        return legacy
+    return bundled
+
+
+def _resolve_app_icon_path() -> str:
+    return _resource_path("fondo", "logo1.ico")
 
 
 def _show_login_screen(root: tk.Tk):
@@ -235,6 +247,12 @@ def main():
         root.withdraw()
         root.title(t("app.title"))
         root.geometry("1400x850")
+        try:
+            icon_path = _resolve_app_icon_path()
+            if os.path.exists(icon_path):
+                root.iconbitmap(icon_path)
+        except Exception:
+            pass
 
         if not is_api_configured():
             messagebox.showerror(

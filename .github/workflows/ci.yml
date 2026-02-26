@@ -62,14 +62,32 @@ jobs:
         run: |
           pytest tests
 
-      - name: Build EXE (PyInstaller)
+      - name: Verify bundled assets exist
+        shell: pwsh
         run: |
-          pyinstaller --clean --noconfirm --onefile --windowed --name gui --add-data "i18n;i18n" gui.py
+          if (!(Test-Path "fondo\f1.png")) { throw "Missing fondo\f1.png" }
+          if (!(Test-Path "fondo\logo1.ico")) { throw "Missing fondo\logo1.ico" }
+          if (!(Test-Path "fondo\logo2.jpg")) { throw "Missing fondo\logo2.jpg" }
 
-      - name: Upload EXE artifact
+      - name: Build EXE (PyInstaller spec)
+        run: |
+          pyinstaller --clean --noconfirm gui.spec
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: |
+          iscc installer\bjjvienna.iss
+          if (!(Test-Path "dist\BJJVienna-Setup.exe")) { throw "Installer build failed: dist\BJJVienna-Setup.exe not found." }
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: bjjvienna-exe
+          name: bjjvienna-build
           path: dist/*.exe
 
   ci-py314:
@@ -127,8 +145,15 @@ jobs:
         run: |
           pytest tests
 
-      - name: Build EXE (PyInstaller)
+      - name: Verify bundled assets exist
+        shell: pwsh
         run: |
-          pyinstaller --clean --noconfirm --onefile --windowed --name gui --add-data "i18n;i18n" gui.py
+          if (!(Test-Path "fondo\f1.png")) { throw "Missing fondo\f1.png" }
+          if (!(Test-Path "fondo\logo1.ico")) { throw "Missing fondo\logo1.ico" }
+          if (!(Test-Path "fondo\logo2.jpg")) { throw "Missing fondo\logo2.jpg" }
+
+      - name: Build EXE (PyInstaller spec)
+        run: |
+          pyinstaller --clean --noconfirm gui.spec
 
       
