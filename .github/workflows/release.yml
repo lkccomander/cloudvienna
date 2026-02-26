@@ -78,11 +78,13 @@ jobs:
         run: |
           choco install innosetup --no-progress -y
 
-      - name: Build installer (Inno Setup)
+      - name: Build installers (Inno Setup)
         shell: pwsh
         run: |
           iscc installer\bjjvienna.iss
+          iscc installer\bjjvienna_railway.iss
           if (!(Test-Path "dist\BJJVienna-Setup.exe")) { throw "Installer build failed: dist\BJJVienna-Setup.exe not found." }
+          if (!(Test-Path "dist\BJJVienna-Setup-Railway.exe")) { throw "Installer build failed: dist\BJJVienna-Setup-Railway.exe not found." }
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
