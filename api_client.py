@@ -231,6 +231,14 @@ def reactivate_student(student_id):
     return _with_auth_request("POST", f"/students/{int(student_id)}/reactivate")
 
 
+def list_student_followups(student_id):
+    return _with_auth_request("GET", f"/students/{int(student_id)}/followups")
+
+
+def upsert_student_followup(student_id, payload):
+    return _with_auth_request("POST", f"/students/{int(student_id)}/followups/upsert", payload=payload)
+
+
 def active_locations():
     return _with_auth_request("GET", "/locations/active")
 

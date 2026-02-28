@@ -15,7 +15,9 @@ from api_client import (
     create_student as api_create_student,
     get_student as api_get_student,
     list_students as api_list_students,
+    list_student_followups as api_list_student_followups,
     reactivate_student as api_reactivate_student,
+    upsert_student_followup as api_upsert_student_followup,
     update_student as api_update_student,
 )
 from i18n import t
@@ -162,6 +164,16 @@ def build(tab_students):
         width=10
     )
     cmb_filter.grid(row=0, column=1)
+
+    # ---------- Follow-up popup ----------
+    followup_popup = tk.Toplevel(tab_students)
+    followup_popup.withdraw()
+    followup_popup.title(t("label.student_followup"))
+    followup_popup.transient(tab_students.winfo_toplevel())
+    followup_popup.resizable(True, True)
+    followup_popup.protocol("WM_DELETE_WINDOW", followup_popup.withdraw)
+    followup_frame = ttk.LabelFrame(followup_popup, text=t("label.student_followup"), padding=10)
+    followup_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
     # ---------- Tree ----------
     tree_frame = ttk.LabelFrame(tab_students, text=t("label.students_list"), padding=10)
@@ -336,6 +348,413 @@ def build(tab_students):
     ttk.Label(form, textvariable=academy_age_value_var).grid(
         row=len(guardian_fields) + 3, column=3, sticky="w", pady=(2, 0)
     )
+
+    # =====================================================
+    # FOLLOW-UP (10 week roadmap)
+    # =====================================================
+    followup_stage = tk.StringVar(value="1")
+    followup_points = tk.StringVar()
+    followup_reason = tk.StringVar()
+    followup_goals = tk.StringVar()
+    followup_goal_details = tk.StringVar()
+    followup_questions = tk.StringVar()
+    followup_benefits = tk.StringVar()
+    followup_issues = tk.StringVar()
+    followup_notes = tk.StringVar()
+    followup_referral = tk.StringVar(value=t("label.none"))
+    followup_upgrade = tk.StringVar(value=t("label.none"))
+    followup_welcome_packet = tk.StringVar(value=t("label.none"))
+    followup_stage_hint = tk.StringVar(value="-")
+    followup_map = {}
+    followup_pending_extra_stage = {"value": None}
+    roadmap_stage_labels = {}
+    stage_windows = {
+        1: (0, 2),
+        2: (2, 4),
+        3: (4, 6),
+        4: (6, 8),
+        5: (8, 10),
+    }
+
+    def _on_stage_badge_click(stage_number):
+        followup_stage.set(str(stage_number))
+        _load_followup_stage_to_form()
+
+    followup_frame.grid_columnconfigure(1, weight=1)
+
+    ttk.Label(followup_frame, text=t("label.followup_current_stage")).grid(row=0, column=0, sticky="w")
+    lbl_followup_current = ttk.Label(followup_frame, text="-")
+    lbl_followup_current.grid(row=0, column=1, sticky="w", padx=(6, 0))
+    ttk.Label(followup_frame, text=t("label.followup_last_call")).grid(row=1, column=0, sticky="w")
+    lbl_followup_last_call = ttk.Label(followup_frame, text="-")
+    lbl_followup_last_call.grid(row=1, column=1, sticky="w", padx=(6, 0))
+
+    roadmap_row = ttk.Frame(followup_frame)
+    roadmap_row.grid(row=2, column=0, columnspan=2, sticky="w", pady=(6, 8))
+    for stage_number in range(1, 6):
+        start_week, end_week = stage_windows[stage_number]
+        badge = tk.Label(
+            roadmap_row,
+            text=f"S{stage_number}",
+            width=4,
+            bg="#bfbfbf",
+            fg="black",
+            relief="ridge",
+            bd=1,
+            cursor="hand2",
+        )
+        badge.grid(row=0, column=stage_number - 1, padx=2)
+        badge.bind("<Button-1>", lambda _event, s=stage_number: _on_stage_badge_click(s))
+        ttk.Label(
+            roadmap_row,
+            text=t("label.followup_week_range", from_week=start_week, to_week=end_week),
+        ).grid(row=1, column=stage_number - 1, padx=2, pady=(2, 0))
+        roadmap_stage_labels[stage_number] = badge
+
+    ttk.Label(followup_frame, text=t("label.followup_stage")).grid(row=3, column=0, sticky="w")
+    followup_stage_cb = ttk.Combobox(
+        followup_frame,
+        textvariable=followup_stage,
+        values=["1", "2", "3", "4", "5"],
+        state="readonly",
+        width=10,
+    )
+    followup_stage_cb.grid(row=3, column=1, sticky="w")
+    ttk.Label(followup_frame, textvariable=followup_stage_hint).grid(row=3, column=1, sticky="e")
+
+    ttk.Label(followup_frame, text=t("label.followup_call_date")).grid(row=4, column=0, sticky="w")
+    followup_call_date = DateEntry(followup_frame, date_pattern="yyyy-mm-dd", width=18)
+    followup_call_date.grid(row=4, column=1, sticky="w")
+
+    followup_fields = [
+        ("label.followup_points", followup_points),
+        ("label.followup_reason", followup_reason),
+        ("label.followup_goals", followup_goals),
+        ("label.followup_goal_details", followup_goal_details),
+        ("label.followup_questions", followup_questions),
+        ("label.followup_benefits", followup_benefits),
+        ("label.followup_issues", followup_issues),
+        ("label.followup_notes", followup_notes),
+    ]
+    for idx, (label_key, var) in enumerate(followup_fields, start=5):
+        ttk.Label(followup_frame, text=t(label_key)).grid(row=idx, column=0, sticky="w")
+        ttk.Entry(followup_frame, textvariable=var, width=28).grid(row=idx, column=1, sticky="w")
+
+    bool_choices = [t("label.none"), t("label.yes"), t("label.no")]
+    ttk.Label(followup_frame, text=t("label.followup_welcome_packet")).grid(row=13, column=0, sticky="w")
+    ttk.Combobox(
+        followup_frame,
+        textvariable=followup_welcome_packet,
+        values=bool_choices,
+        state="readonly",
+        width=10,
+    ).grid(row=13, column=1, sticky="w")
+    ttk.Label(followup_frame, text=t("label.followup_referral")).grid(row=14, column=0, sticky="w")
+    ttk.Combobox(
+        followup_frame,
+        textvariable=followup_referral,
+        values=bool_choices,
+        state="readonly",
+        width=10,
+    ).grid(row=14, column=1, sticky="w")
+    ttk.Label(followup_frame, text=t("label.followup_upgrade")).grid(row=15, column=0, sticky="w")
+    ttk.Combobox(
+        followup_frame,
+        textvariable=followup_upgrade,
+        values=bool_choices,
+        state="readonly",
+        width=10,
+    ).grid(row=15, column=1, sticky="w")
+
+    ttk.Label(followup_frame, text=t("label.followup_upgrade_date")).grid(row=16, column=0, sticky="w")
+    followup_upgrade_date = DateEntry(followup_frame, date_pattern="yyyy-mm-dd", width=18)
+    followup_upgrade_date.grid(row=16, column=1, sticky="w")
+
+    def _bool_choice_to_value(choice):
+        if choice == t("label.yes"):
+            return True
+        if choice == t("label.no"):
+            return False
+        return None
+
+    def _bool_value_to_choice(value):
+        if value is True:
+            return t("label.yes")
+        if value is False:
+            return t("label.no")
+        return t("label.none")
+
+    def _parse_iso_date(value):
+        if not value:
+            return None
+        if isinstance(value, date):
+            return value
+        if isinstance(value, str):
+            try:
+                return date.fromisoformat(value[:10])
+            except ValueError:
+                return None
+        return None
+
+    def _set_stage_hint():
+        stage_number = int(followup_stage.get() or "1")
+        if stage_number > 5:
+            followup_stage_hint.set("-")
+            return
+        start_week, end_week = stage_windows.get(stage_number, (0, 0))
+        followup_stage_hint.set(t("label.followup_week_range", from_week=start_week, to_week=end_week))
+
+    def _set_upgrade_date_state():
+        should_enable = _bool_choice_to_value(followup_upgrade.get()) is True
+        state = "normal" if should_enable else "disabled"
+        followup_upgrade_date.configure(state=state)
+
+    def _is_base_program_completed():
+        return all(bool(followup_map.get(stage_number)) for stage_number in range(1, 6))
+
+    def _sync_stage_selector_options():
+        values = ["1", "2", "3", "4", "5"]
+        extra_stage_values = sorted(
+            {int(stage_number) for stage_number in followup_map.keys() if int(stage_number) > 5}
+        )
+        pending_stage = followup_pending_extra_stage.get("value")
+        if isinstance(pending_stage, int) and pending_stage > 5:
+            extra_stage_values = sorted(set([*extra_stage_values, pending_stage]))
+        values.extend([str(stage_number) for stage_number in extra_stage_values])
+        followup_stage_cb["values"] = values
+        if followup_stage.get() not in values:
+            followup_stage.set("1")
+
+    def _set_new_followup_button_state():
+        btn_new_followup.config(state="normal" if _is_base_program_completed() else "disabled")
+
+    def _render_previous_stages_summary():
+        previous_stage_text.config(state="normal")
+        previous_stage_text.delete("1.0", tk.END)
+        if _is_base_program_completed():
+            previous_stage_text.insert(tk.END, f"{t('label.followup_all_stages_completed')}\n\n", "stage_header")
+        has_content = False
+        for stage_number in sorted(followup_map.keys()):
+            row = followup_map.get(stage_number) or {}
+            has_content = True
+            previous_stage_text.insert(tk.END, f"{t('label.followup_stage')} {stage_number}\n", "stage_header")
+            fields = [
+                (t("label.followup_call_date"), row.get("call_date")),
+                (t("label.followup_points"), row.get("points_of_interest")),
+                (t("label.followup_reason"), row.get("main_reason")),
+                (t("label.followup_goals"), row.get("goals")),
+                (t("label.followup_goal_details"), row.get("goal_details")),
+                (t("label.followup_questions"), row.get("questions")),
+                (t("label.followup_benefits"), row.get("benefits_seen")),
+                (t("label.followup_issues"), row.get("issues_detected")),
+                (t("label.followup_referral"), _bool_value_to_choice(row.get("referral_requested"))),
+                (t("label.followup_upgrade"), _bool_value_to_choice(row.get("upgrade_appointment_scheduled"))),
+                (t("label.followup_notes"), row.get("notes")),
+            ]
+            for label, value in fields:
+                clean = (str(value).strip() if value is not None else "")
+                if clean and clean != t("label.none"):
+                    previous_stage_text.insert(tk.END, f"{label}: {clean}\n", "body")
+            previous_stage_text.insert(tk.END, "\n", "body")
+        if not has_content:
+            previous_stage_text.insert(tk.END, t("label.no_data"), "body")
+        previous_stage_text.config(state="disabled")
+
+    def _start_new_followup():
+        if not _is_base_program_completed():
+            return
+        existing_stages = [int(stage_number) for stage_number in followup_map.keys()]
+        next_stage = max(existing_stages) + 1 if existing_stages else 7
+        if next_stage < 7:
+            next_stage = 7
+        followup_pending_extra_stage["value"] = next_stage
+        followup_stage.set(str(next_stage))
+        _sync_stage_selector_options()
+        _reset_followup_form()
+        _load_followup_stage_to_form()
+
+    def _reset_followup_form():
+        followup_points.set("")
+        followup_reason.set("")
+        followup_goals.set("")
+        followup_goal_details.set("")
+        followup_questions.set("")
+        followup_benefits.set("")
+        followup_issues.set("")
+        followup_notes.set("")
+        followup_referral.set(t("label.none"))
+        followup_upgrade.set(t("label.none"))
+        followup_welcome_packet.set(t("label.none"))
+        followup_call_date.set_date(date.today())
+        followup_upgrade_date.set_date(date.today())
+        _sync_stage_selector_options()
+        _set_stage_hint()
+        _set_upgrade_date_state()
+        _render_previous_stages_summary()
+        _set_new_followup_button_state()
+
+    def _load_followup_stage_to_form():
+        stage_number = int(followup_stage.get() or "1")
+        row = followup_map.get(stage_number) or {}
+        followup_points.set(row.get("points_of_interest") or "")
+        followup_reason.set(row.get("main_reason") or "")
+        followup_goals.set(row.get("goals") or "")
+        followup_goal_details.set(row.get("goal_details") or "")
+        followup_questions.set(row.get("questions") or "")
+        followup_benefits.set(row.get("benefits_seen") or "")
+        followup_issues.set(row.get("issues_detected") or "")
+        followup_notes.set(row.get("notes") or "")
+        followup_referral.set(_bool_value_to_choice(row.get("referral_requested")))
+        followup_upgrade.set(_bool_value_to_choice(row.get("upgrade_appointment_scheduled")))
+        followup_welcome_packet.set(_bool_value_to_choice(row.get("welcome_packet_read")))
+        parsed_call_date = _parse_iso_date(row.get("call_date"))
+        parsed_upgrade_date = _parse_iso_date(row.get("upgrade_appointment_date"))
+        followup_call_date.set_date(parsed_call_date or date.today())
+        followup_upgrade_date.set_date(parsed_upgrade_date or date.today())
+        _sync_stage_selector_options()
+        _set_stage_hint()
+        _set_upgrade_date_state()
+        _render_previous_stages_summary()
+        _set_new_followup_button_state()
+
+    def _render_followup_roadmap(roadmap):
+        program_completed = bool(roadmap.get("program_completed"))
+        current_stage = roadmap.get("current_stage")
+        days_since = roadmap.get("days_since_enrollment")
+        if program_completed:
+            lbl_followup_current.config(text=t("label.followup_completed"))
+        elif current_stage:
+            start_week, end_week = stage_windows.get(int(current_stage), (0, 0))
+            lbl_followup_current.config(
+                text=f"{t('label.followup_stage')} {current_stage} ({t('label.followup_week_range', from_week=start_week, to_week=end_week)})"
+            )
+        elif days_since is None:
+            lbl_followup_current.config(text="-")
+        else:
+            lbl_followup_current.config(text=t("label.no_data"))
+        last_call = roadmap.get("last_call_date")
+        lbl_followup_last_call.config(text=last_call or "-")
+
+        status_map = {}
+        for item in roadmap.get("stages", []):
+            status_map[int(item.get("stage_number", 0))] = item.get("status")
+        has_completed_stage = any(value == "completed" for value in status_map.values())
+        for stage_number, badge in roadmap_stage_labels.items():
+            status = status_map.get(stage_number, "pending")
+            if status == "completed":
+                badge.config(bg="#38a169", fg="white")
+            elif status == "current":
+                badge.config(bg="#dd6b20", fg="white")
+            else:
+                if has_completed_stage:
+                    badge.config(bg="#f6e05e", fg="black")
+                else:
+                    badge.config(bg="#bfbfbf", fg="black")
+
+    def load_student_followup_data():
+        nonlocal selected_student_id
+        followup_map.clear()
+        followup_pending_extra_stage["value"] = None
+        if not selected_student_id:
+            lbl_followup_current.config(text="-")
+            lbl_followup_last_call.config(text="-")
+            for badge in roadmap_stage_labels.values():
+                badge.config(bg="#bfbfbf", fg="black")
+            _reset_followup_form()
+            return
+        try:
+            data = api_list_student_followups(selected_student_id)
+        except ApiError as ae:
+            messagebox.showerror(t("alert.api_error_title"), str(ae))
+            return
+        for item in data.get("followups", []):
+            stage_number = int(item.get("stage_number", 0))
+            if stage_number:
+                followup_map[stage_number] = item
+        pending_stage = followup_pending_extra_stage.get("value")
+        if isinstance(pending_stage, int) and pending_stage in followup_map:
+            followup_pending_extra_stage["value"] = None
+        _sync_stage_selector_options()
+        _render_followup_roadmap(data)
+        _load_followup_stage_to_form()
+        _set_new_followup_button_state()
+
+    def save_student_followup():
+        if not selected_student_id:
+            messagebox.showerror(t("alert.validation_title"), t("alert.select_student"))
+            return
+        stage_number = int(followup_stage.get() or "1")
+        payload = {
+            "stage_number": stage_number,
+            "call_date": followup_call_date.get_date().isoformat() if followup_call_date.get_date() else None,
+            "points_of_interest": followup_points.get().strip() or None,
+            "main_reason": followup_reason.get().strip() or None,
+            "goals": followup_goals.get().strip() or None,
+            "goal_details": followup_goal_details.get().strip() or None,
+            "welcome_packet_read": _bool_choice_to_value(followup_welcome_packet.get()),
+            "questions": followup_questions.get().strip() or None,
+            "benefits_seen": followup_benefits.get().strip() or None,
+            "issues_detected": followup_issues.get().strip() or None,
+            "referral_requested": _bool_choice_to_value(followup_referral.get()),
+            "upgrade_appointment_scheduled": _bool_choice_to_value(followup_upgrade.get()),
+            "upgrade_appointment_date": (
+                followup_upgrade_date.get_date().isoformat()
+                if _bool_choice_to_value(followup_upgrade.get()) is True
+                else None
+            ),
+            "notes": followup_notes.get().strip() or None,
+        }
+        try:
+            api_upsert_student_followup(selected_student_id, payload)
+            messagebox.showinfo("OK", t("label.followup_saved"))
+            load_student_followup_data()
+        except ApiError as ae:
+            messagebox.showerror(t("alert.api_error_title"), str(ae))
+
+    ttk.Button(followup_frame, text=t("button.followup_save"), command=save_student_followup).grid(
+        row=17, column=0, padx=(0, 6), pady=(8, 0), sticky="w"
+    )
+    ttk.Button(followup_frame, text=t("button.clear"), command=_reset_followup_form).grid(
+        row=17, column=1, pady=(8, 0), sticky="w"
+    )
+    previous_stage_frame = ttk.LabelFrame(followup_frame, text=t("label.followup_previous_stages"), padding=8)
+    previous_stage_frame.grid(row=18, column=0, columnspan=2, sticky="nsew", pady=(10, 0))
+    previous_stage_frame.grid_rowconfigure(0, weight=1)
+    previous_stage_frame.grid_columnconfigure(0, weight=1)
+    followup_frame.grid_rowconfigure(18, weight=1)
+    previous_stage_text = tk.Text(previous_stage_frame, height=12, wrap="word")
+    previous_stage_text.grid(row=0, column=0, sticky="nsew")
+    previous_stage_scroll = ttk.Scrollbar(previous_stage_frame, orient="vertical", command=previous_stage_text.yview)
+    previous_stage_scroll.grid(row=0, column=1, sticky="ns")
+    previous_stage_text.configure(yscrollcommand=previous_stage_scroll.set)
+    previous_stage_text.tag_configure("stage_header", foreground="#1e4fa3", font=("TkDefaultFont", 10, "bold"))
+    previous_stage_text.tag_configure("body", foreground="#111111")
+    btn_new_followup = ttk.Button(
+        previous_stage_frame,
+        text=t("button.followup_new"),
+        command=_start_new_followup,
+        state="disabled",
+    )
+    btn_new_followup.grid(row=1, column=0, sticky="w", pady=(8, 0))
+    followup_stage_cb.bind("<<ComboboxSelected>>", lambda _event: _load_followup_stage_to_form())
+    followup_upgrade.trace_add("write", lambda *_args: _set_upgrade_date_state())
+    _reset_followup_form()
+
+    def open_followup_popup():
+        if not selected_student_id:
+            messagebox.showerror(t("alert.validation_title"), t("alert.select_student"))
+            return
+        load_student_followup_data()
+        root = tab_students.winfo_toplevel()
+        root.update_idletasks()
+        width = max(root.winfo_width(), 900)
+        height = max(root.winfo_height(), 650)
+        x = root.winfo_rootx()
+        y = root.winfo_rooty()
+        followup_popup.geometry(f"{width}x{height}+{x}+{y}")
+        followup_popup.deiconify()
+        followup_popup.lift()
+        followup_popup.focus_force()
 
     # Refresh the location combobox on click to pick up new locations.
     def on_location_click(event):
@@ -614,6 +1033,7 @@ def build(tab_students):
         selected_student_id = None
         selected_student_active = None
         member_since["date"] = None
+        followup_popup.withdraw()
 
         st_name.set("")
         st_sex.set("")
@@ -639,6 +1059,7 @@ def build(tab_students):
         _update_student_academy_age_label()
 
         update_button_states()
+        load_student_followup_data()
 
     # =====================================================
     # BUTTONS (outside form)
@@ -650,16 +1071,19 @@ def build(tab_students):
     btn_update = ttk.Button(btns, text=t("button.update"), command=update_student)
     btn_deactivate = ttk.Button(btns, text=t("button.deactivate"), command=deactivate_student)
     btn_reactivate = ttk.Button(btns, text=t("button.reactivate"), command=reactivate_student)
+    btn_followup = ttk.Button(btns, text=t("button.followup_open"), command=open_followup_popup)
     btn_clear = ttk.Button(btns, text=t("button.clear"), command=clear_student_form)
 
     btn_register.grid(row=0, column=0, padx=5)
     btn_update.grid(row=0, column=1, padx=5)
     btn_deactivate.grid(row=0, column=2, padx=5)
     btn_reactivate.grid(row=0, column=3, padx=5)
-    btn_clear.grid(row=0, column=4, padx=5)
+    btn_followup.grid(row=0, column=4, padx=5)
+    btn_clear.grid(row=0, column=5, padx=5)
 
     btn_deactivate.config(state="disabled")
     btn_reactivate.config(state="disabled")
+    btn_followup.config(state="disabled")
 
     # =====================================================
     # TREEVIEW
@@ -711,12 +1135,15 @@ def build(tab_students):
         if selected_student_active is None:
             btn_deactivate.config(state="disabled")
             btn_reactivate.config(state="disabled")
+            btn_followup.config(state="disabled")
         elif selected_student_active:
             btn_deactivate.config(state="normal")
             btn_reactivate.config(state="disabled")
+            btn_followup.config(state="normal")
         else:
             btn_deactivate.config(state="disabled")
             btn_reactivate.config(state="normal")
+            btn_followup.config(state="normal")
 
     # Populate student form fields when a student row is selected.
     def on_student_select(event):
@@ -795,6 +1222,7 @@ def build(tab_students):
         _update_student_academy_age_label()
 
         update_button_states()
+        load_student_followup_data()
 
     students_tree.bind("<<TreeviewSelect>>", on_student_select)
 
@@ -807,7 +1235,9 @@ def build(tab_students):
         nonlocal current_student_page
         selected_student_id = None
         selected_student_active = None
+        followup_popup.withdraw()
         update_button_states()
+        load_student_followup_data()
 
         for r in students_tree.get_children():
             students_tree.delete(r)
