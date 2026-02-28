@@ -356,6 +356,72 @@ class StudentDetailOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class StudentFollowupUpsertIn(BaseModel):
+    stage_number: int = Field(ge=1)
+    call_date: Optional[date] = None
+    points_of_interest: Optional[str] = None
+    main_reason: Optional[str] = None
+    goals: Optional[str] = None
+    goal_details: Optional[str] = None
+    welcome_packet_read: Optional[bool] = None
+    questions: Optional[str] = None
+    benefits_seen: Optional[str] = None
+    attendance_summary: Optional[str] = None
+    equipment_status: Optional[str] = None
+    events_discussed: Optional[str] = None
+    motivation_notes: Optional[str] = None
+    issues_detected: Optional[str] = None
+    referral_requested: Optional[bool] = None
+    upgrade_appointment_scheduled: Optional[bool] = None
+    upgrade_appointment_date: Optional[date] = None
+    notes: Optional[str] = None
+
+
+class StudentFollowupOut(BaseModel):
+    id: int
+    student_id: int
+    stage_number: int
+    call_date: Optional[date] = None
+    points_of_interest: Optional[str] = None
+    main_reason: Optional[str] = None
+    goals: Optional[str] = None
+    goal_details: Optional[str] = None
+    welcome_packet_read: Optional[bool] = None
+    questions: Optional[str] = None
+    benefits_seen: Optional[str] = None
+    attendance_summary: Optional[str] = None
+    equipment_status: Optional[str] = None
+    events_discussed: Optional[str] = None
+    motivation_notes: Optional[str] = None
+    issues_detected: Optional[str] = None
+    referral_requested: Optional[bool] = None
+    upgrade_appointment_scheduled: Optional[bool] = None
+    upgrade_appointment_date: Optional[date] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StudentFollowupStageStatus(BaseModel):
+    stage_number: int
+    status: Literal["pending", "current", "completed"]
+    followup_id: Optional[int] = None
+    call_date: Optional[date] = None
+
+
+class StudentFollowupRoadmapOut(BaseModel):
+    student_id: int
+    enrollment_date: Optional[date] = None
+    days_since_enrollment: Optional[int] = None
+    current_stage: Optional[int] = None
+    program_completed: bool = False
+    last_call_date: Optional[date] = None
+    stages: list[StudentFollowupStageStatus]
+    followups: list[StudentFollowupOut]
+
+
 class AuditLogRow(BaseModel):
     id: int
     actor_user_id: Optional[int] = None

@@ -43,7 +43,11 @@ project_brain/
 error.txt
 scripts/
 <<<<<<< HEAD
+<<<<<<< HEAD
 security/
 tests/
 =======
 >>>>>>> 30f2109 (NEW ignores)
+=======
+tests/
+>>>>>>> 77aa6bc6ef215289342a129e156975e549086820

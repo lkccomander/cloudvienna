@@ -5,7 +5,7 @@ import time
 import uuid
 from io import StringIO
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, Response
@@ -67,6 +67,10 @@ from backend.schemas import (
     StudentBatchCreateResult,
     StudentCreateResponse,
     StudentDetailOut,
+    StudentFollowupOut,
+    StudentFollowupRoadmapOut,
+    StudentFollowupStageStatus,
+    StudentFollowupUpsertIn,
     StudentOut,
     StudentUpdateRequest,
     TokenResponse,
@@ -327,6 +331,71 @@ def _run_startup_migrations():
     execute("CREATE INDEX IF NOT EXISTS idx_audit_log_actor_user_id ON audit_log (actor_user_id)")
     execute("CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log (action)")
     execute("CREATE INDEX IF NOT EXISTS idx_audit_log_resource_type ON audit_log (resource_type)")
+    execute(
+        """
+        CREATE TABLE IF NOT EXISTS t_student_followups (
+            id serial PRIMARY KEY,
+            student_id integer NOT NULL REFERENCES t_students(id) ON DELETE CASCADE,
+            stage_number integer NOT NULL CHECK (stage_number >= 1),
+            call_date date,
+            points_of_interest text,
+            main_reason text,
+            goals text,
+            goal_details text,
+            welcome_packet_read boolean,
+            questions text,
+            benefits_seen text,
+            attendance_summary text,
+            equipment_status text,
+            events_discussed text,
+            motivation_notes text,
+            issues_detected text,
+            referral_requested boolean,
+            upgrade_appointment_scheduled boolean,
+            upgrade_appointment_date date,
+            notes text,
+            created_at timestamp NOT NULL DEFAULT now(),
+            updated_at timestamp
+        )
+        """
+    )
+    execute(
+        """
+        DO $$
+        BEGIN
+            ALTER TABLE t_student_followups DROP CONSTRAINT IF EXISTS t_student_followups_stage_number_check;
+            ALTER TABLE t_student_followups DROP CONSTRAINT IF EXISTS ck_student_followups_stage_number;
+            ALTER TABLE t_student_followups
+                ADD CONSTRAINT ck_student_followups_stage_number
+                CHECK (stage_number >= 1);
+        EXCEPTION
+            WHEN duplicate_object THEN NULL;
+        END $$;
+        """
+    )
+    execute(
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'uq_student_followup_stage'
+            ) THEN
+                ALTER TABLE t_student_followups
+                ADD CONSTRAINT uq_student_followup_stage UNIQUE (student_id, stage_number);
+            END IF;
+        EXCEPTION
+            WHEN duplicate_table OR duplicate_object THEN NULL;
+        END $$;
+        """
+    )
+    execute(
+        "CREATE INDEX IF NOT EXISTS idx_student_followups_student_stage ON t_student_followups (student_id, stage_number)"
+    )
+    execute(
+        "CREATE INDEX IF NOT EXISTS idx_student_followups_call_date ON t_student_followups (call_date DESC)"
+    )
 
 
 @asynccontextmanager
@@ -449,6 +518,30 @@ def _audit_cud(
         resource_id=str(resource_id) if resource_id is not None else None,
         details=details or {},
     )
+
+
+def _student_program_progress(enrollment_date: date | None) -> tuple[int | None, bool, int | None]:
+    if not enrollment_date:
+        return None, False, None
+    days_since = max((datetime.now(timezone.utc).date() - enrollment_date).days, 0)
+    if days_since >= 70:
+        return None, True, days_since
+    stage = min((days_since // 14) + 1, 5)
+    return int(stage), False, days_since
+
+
+def _student_exists(student_id: int) -> dict:
+    row = fetch_one(
+        """
+        SELECT id, created_at::date AS enrollment_date
+        FROM t_students
+        WHERE id = %s
+        """,
+        (student_id,),
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+    return row
 
 
 def _build_audit_where(
@@ -2053,3 +2146,132 @@ def reactivate_student(student_id: int, subject: str = Depends(_require_update_a
         details={"active": True},
     )
     return {"status": "ok", "id": row["id"], "active": True}
+
+
+@app.get("/students/{student_id}/followups", response_model=StudentFollowupRoadmapOut)
+def list_student_followups(student_id: int, _: str = Depends(_require_auth)):
+    student = _student_exists(student_id)
+    rows = fetch_all(
+        """
+        SELECT id, student_id, stage_number, call_date, points_of_interest, main_reason, goals,
+               goal_details, welcome_packet_read, questions, benefits_seen, attendance_summary,
+               equipment_status, events_discussed, motivation_notes, issues_detected,
+               referral_requested, upgrade_appointment_scheduled, upgrade_appointment_date,
+               notes, created_at, updated_at
+        FROM t_student_followups
+        WHERE student_id = %s
+        ORDER BY stage_number
+        """,
+        (student_id,),
+    )
+    followups = [StudentFollowupOut.model_validate(row) for row in rows]
+
+    completed_map = {item.stage_number: item for item in followups}
+    enrollment_date = student.get("enrollment_date")
+    current_stage, program_completed, days_since = _student_program_progress(enrollment_date)
+    stages: list[StudentFollowupStageStatus] = []
+    for stage_number in range(1, 6):
+        row = completed_map.get(stage_number)
+        if row:
+            status_value = "completed"
+        elif (not program_completed) and current_stage == stage_number:
+            status_value = "current"
+        else:
+            status_value = "pending"
+        stages.append(
+            StudentFollowupStageStatus(
+                stage_number=stage_number,
+                status=status_value,
+                followup_id=row.id if row else None,
+                call_date=row.call_date if row else None,
+            )
+        )
+
+    last_call_date = None
+    if followups:
+        last_call_date = max((item.call_date for item in followups if item.call_date), default=None)
+    return StudentFollowupRoadmapOut(
+        student_id=student_id,
+        enrollment_date=enrollment_date,
+        days_since_enrollment=days_since,
+        current_stage=current_stage,
+        program_completed=program_completed,
+        last_call_date=last_call_date,
+        stages=stages,
+        followups=followups,
+    )
+
+
+@app.post("/students/{student_id}/followups/upsert", response_model=StudentFollowupOut)
+def upsert_student_followup(
+    student_id: int,
+    payload: StudentFollowupUpsertIn,
+    subject: str = Depends(_require_update_access),
+):
+    _student_exists(student_id)
+    row = execute_returning_one(
+        """
+        INSERT INTO t_student_followups (
+            student_id, stage_number, call_date, points_of_interest, main_reason, goals,
+            goal_details, welcome_packet_read, questions, benefits_seen, attendance_summary,
+            equipment_status, events_discussed, motivation_notes, issues_detected,
+            referral_requested, upgrade_appointment_scheduled, upgrade_appointment_date, notes
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+        )
+        ON CONFLICT (student_id, stage_number)
+        DO UPDATE SET
+            call_date = EXCLUDED.call_date,
+            points_of_interest = EXCLUDED.points_of_interest,
+            main_reason = EXCLUDED.main_reason,
+            goals = EXCLUDED.goals,
+            goal_details = EXCLUDED.goal_details,
+            welcome_packet_read = EXCLUDED.welcome_packet_read,
+            questions = EXCLUDED.questions,
+            benefits_seen = EXCLUDED.benefits_seen,
+            attendance_summary = EXCLUDED.attendance_summary,
+            equipment_status = EXCLUDED.equipment_status,
+            events_discussed = EXCLUDED.events_discussed,
+            motivation_notes = EXCLUDED.motivation_notes,
+            issues_detected = EXCLUDED.issues_detected,
+            referral_requested = EXCLUDED.referral_requested,
+            upgrade_appointment_scheduled = EXCLUDED.upgrade_appointment_scheduled,
+            upgrade_appointment_date = EXCLUDED.upgrade_appointment_date,
+            notes = EXCLUDED.notes,
+            updated_at = now()
+        RETURNING id, student_id, stage_number, call_date, points_of_interest, main_reason,
+                  goals, goal_details, welcome_packet_read, questions, benefits_seen,
+                  attendance_summary, equipment_status, events_discussed, motivation_notes,
+                  issues_detected, referral_requested, upgrade_appointment_scheduled,
+                  upgrade_appointment_date, notes, created_at, updated_at
+        """,
+        (
+            student_id,
+            payload.stage_number,
+            payload.call_date,
+            payload.points_of_interest,
+            payload.main_reason,
+            payload.goals,
+            payload.goal_details,
+            payload.welcome_packet_read,
+            payload.questions,
+            payload.benefits_seen,
+            payload.attendance_summary,
+            payload.equipment_status,
+            payload.events_discussed,
+            payload.motivation_notes,
+            payload.issues_detected,
+            payload.referral_requested,
+            payload.upgrade_appointment_scheduled,
+            payload.upgrade_appointment_date,
+            payload.notes,
+        ),
+    )
+    _audit_cud(
+        subject=subject,
+        action="students.followup_upsert",
+        resource_type="student_followup",
+        resource_id=row["id"],
+        details={"student_id": student_id, "stage_number": payload.stage_number},
+    )
+    return StudentFollowupOut.model_validate(row)

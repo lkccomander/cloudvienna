@@ -1,5 +1,20 @@
-hint: See the 'Note about fast-forwards' in 'git push --help' for details.
-(.venv) PS C:\Projects\cloudvienna> git pull --rebase origin main
-error: cannot pull with rebase: You have unstaged changes.
-error: Please commit or stash them.
-(.venv) PS C:\Projects\cloudvienna> 
+Run pyinstaller --clean --noconfirm gui.spec
+192 INFO: PyInstaller: 6.18.0, contrib hooks: 2026.1
+192 INFO: Python: 3.11.9
+200 INFO: Platform: Windows-10-10.0.26100-SP0
+200 INFO: Python environment: C:\hostedtoolcache\windows\Python\3.11.9\x64
+202 INFO: Removing temporary files and cleaning cache in C:\Users\runneradmin\AppData\Local\pyinstaller
+203 INFO: Module search paths (PYTHONPATH):
+['C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\Scripts\\pyinstaller.exe',
+ 'C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python311.zip',
+ 'C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\DLLs',
+ 'C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\Lib',
+ 'C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64',
+ 'C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\Lib\\site-packages',
+ 'C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\Lib\\site-packages\\win32',
+ 'C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\Lib\\site-packages\\win32\\lib',
+ 'C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\Lib\\site-packages\\Pythonwin',
+ 'D:\\a\\cloudvienna\\cloudvienna']
+495 INFO: Appending 'datas' from .spec
+ERROR: Unable to find 'D:\\a\\cloudvienna\\cloudvienna\\app_settings.json' when adding binary and data files.
+Error: Process completed with exit code 1.
