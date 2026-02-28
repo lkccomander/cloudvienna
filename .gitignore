@@ -42,5 +42,8 @@ errorapi.txt
 project_brain/
 error.txt
 scripts/
+<<<<<<< HEAD
 security/
 tests/
+=======
+>>>>>>> 30f2109 (NEW ignores)
