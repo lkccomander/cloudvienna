@@ -92,11 +92,27 @@ validate_security_settings()
 
 
 def _login_identity(username: str, request: Request) -> str:
+    """executes the login identity operation.
+
+    @type username: str
+    @param username: The username value used by this operation.
+    @type request: Request
+    @param request: The request value used by this operation.
+    @rtype: str
+    @returns: The result produced by this operation.
+    """
     host = request.client.host if request.client else "unknown"
     return f"{username.lower()}@{host}"
 
 
 def _is_login_blocked(identity: str) -> bool:
+    """executes the is login blocked operation.
+
+    @type identity: str
+    @param identity: The identity value used by this operation.
+    @rtype: bool
+    @returns: The result produced by this operation.
+    """
     now = time.time()
     with _LOGIN_LOCK:
         blocked_until = _LOGIN_BLOCKED_UNTIL.get(identity, 0.0)
@@ -107,6 +123,13 @@ def _is_login_blocked(identity: str) -> bool:
 
 
 def _record_failed_login(identity: str) -> None:
+    """executes the record failed login operation.
+
+    @type identity: str
+    @param identity: The identity value used by this operation.
+    @rtype: None
+    @returns: The result produced by this operation.
+    """
     now = time.time()
     threshold = now - API_LOGIN_RATE_LIMIT_WINDOW_SECONDS
     with _LOGIN_LOCK:
@@ -119,6 +142,13 @@ def _record_failed_login(identity: str) -> None:
 
 
 def _clear_failed_logins(identity: str) -> None:
+    """executes the clear failed logins operation.
+
+    @type identity: str
+    @param identity: The identity value used by this operation.
+    @rtype: None
+    @returns: The result produced by this operation.
+    """
     with _LOGIN_LOCK:
         _LOGIN_FAILURES.pop(identity, None)
         _LOGIN_BLOCKED_UNTIL.pop(identity, None)
@@ -126,6 +156,13 @@ def _clear_failed_logins(identity: str) -> None:
 
 def _run_startup_migrations():
     # Keep API resilient with legacy databases used by the current desktop app.
+    """executes the run startup migrations operation.
+
+    @type none: None
+    @param none: This operation does not require input parameters.
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     execute(
         """
         CREATE TABLE IF NOT EXISTS t_locations (
@@ -400,6 +437,13 @@ def _run_startup_migrations():
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    """Asynchronously executes the lifespan operation.
+
+    @type _app: FastAPI
+    @param _app: The _app value used by this operation.
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     _run_startup_migrations()
     yield
 
@@ -409,6 +453,15 @@ app = FastAPI(title="BJJ Vienna API", version="0.1.0", lifespan=lifespan)
 
 @app.middleware("http")
 async def correlation_middleware(request: Request, call_next):
+    """Asynchronously executes the correlation middleware operation.
+
+    @type request: Request
+    @param request: The request value used by this operation.
+    @type call_next: Any
+    @param call_next: The call_next value used by this operation.
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     incoming = request.headers.get("x-correlation-id") or request.headers.get("x-request-id")
     correlation_id = (incoming or f"req_{uuid.uuid4().hex}").strip()
     ip_address = request.client.host if request.client else "unknown"
@@ -425,10 +478,24 @@ async def correlation_middleware(request: Request, call_next):
 
 @app.get("/")
 def root():
+    """executes the root operation.
+
+    @type none: None
+    @param none: This operation does not require input parameters.
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     return {"status": "ok", "service": "bjj-vienna-api"}
 
 
 def _normalize_sex(value: str) -> str:
+    """executes the normalize sex operation.
+
+    @type value: str
+    @param value: The value value used by this operation.
+    @rtype: str
+    @returns: The result produced by this operation.
+    """
     normalized = (value or "").strip().upper()
     if normalized in ("M", "F", "NA"):
         return normalized
@@ -447,12 +514,26 @@ def _normalize_sex(value: str) -> str:
 def _require_auth(
     credentials: HTTPAuthorizationCredentials = Depends(auth_scheme),
 ) -> str:
+    """executes the require auth operation.
+
+    @type credentials: HTTPAuthorizationCredentials
+    @param credentials: The credentials value used by this operation (optional).
+    @rtype: str
+    @returns: The result produced by this operation.
+    """
     subject = verify_access_token(credentials.credentials)
     _get_user_by_subject(subject)
     return subject
 
 
 def _get_user_by_subject(subject: str):
+    """executes the get user by subject operation.
+
+    @type subject: str
+    @param subject: The subject value used by this operation.
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = fetch_one(
         """
         SELECT id, username, role, can_write, can_update, active
@@ -467,6 +548,13 @@ def _get_user_by_subject(subject: str):
 
 
 def _require_admin(subject: str = Depends(_require_auth)) -> str:
+    """executes the require admin operation.
+
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: str
+    @returns: The result produced by this operation.
+    """
     row = _get_user_by_subject(subject)
     if row.get("role") != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
@@ -474,6 +562,13 @@ def _require_admin(subject: str = Depends(_require_auth)) -> str:
 
 
 def _require_write_access(subject: str = Depends(_require_auth)) -> str:
+    """executes the require write access operation.
+
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: str
+    @returns: The result produced by this operation.
+    """
     row = _get_user_by_subject(subject)
     if row.get("role") == "admin":
         return subject
@@ -486,6 +581,13 @@ def _require_write_access(subject: str = Depends(_require_auth)) -> str:
 
 
 def _require_update_access(subject: str = Depends(_require_auth)) -> str:
+    """executes the require update access operation.
+
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: str
+    @returns: The result produced by this operation.
+    """
     row = _get_user_by_subject(subject)
     if row.get("role") == "admin":
         return subject
@@ -505,6 +607,21 @@ def _audit_cud(
     resource_id: str | int | None = None,
     details: dict | None = None,
 ) -> None:
+    """executes the audit cud operation.
+
+    @type subject: str
+    @param subject: The subject value used by this operation.
+    @type action: str
+    @param action: The action value used by this operation.
+    @type resource_type: str
+    @param resource_type: The resource_type value used by this operation.
+    @type resource_id: str | int | None
+    @param resource_id: The resource_id value used by this operation (optional).
+    @type details: dict | None
+    @param details: The details value used by this operation (optional).
+    @rtype: None
+    @returns: The result produced by this operation.
+    """
     try:
         actor = _get_user_by_subject(subject)
     except HTTPException:
@@ -521,6 +638,13 @@ def _audit_cud(
 
 
 def _student_program_progress(enrollment_date: date | None) -> tuple[int | None, bool, int | None]:
+    """executes the student program progress operation.
+
+    @type enrollment_date: date | None
+    @param enrollment_date: The enrollment_date value used by this operation.
+    @rtype: tuple[int | None, bool, int | None]
+    @returns: The result produced by this operation.
+    """
     if not enrollment_date:
         return None, False, None
     days_since = max((datetime.now(timezone.utc).date() - enrollment_date).days, 0)
@@ -531,6 +655,13 @@ def _student_program_progress(enrollment_date: date | None) -> tuple[int | None,
 
 
 def _student_exists(student_id: int) -> dict:
+    """executes the student exists operation.
+
+    @type student_id: int
+    @param student_id: The student_id value used by this operation.
+    @rtype: dict
+    @returns: The result produced by this operation.
+    """
     row = fetch_one(
         """
         SELECT id, created_at::date AS enrollment_date
@@ -553,6 +684,23 @@ def _build_audit_where(
     resource_type: str,
     result: str,
 ) -> tuple[str, list[object]]:
+    """executes the build audit where operation.
+
+    @type date_from: str | None
+    @param date_from: The date_from value used by this operation.
+    @type date_to: str | None
+    @param date_to: The date_to value used by this operation.
+    @type actor_username: str
+    @param actor_username: The actor_username value used by this operation.
+    @type action: str
+    @param action: The action value used by this operation.
+    @type resource_type: str
+    @param resource_type: The resource_type value used by this operation.
+    @type result: str
+    @param result: The result value used by this operation.
+    @rtype: tuple[str, list[object]]
+    @returns: The result produced by this operation.
+    """
     where_clauses = []
     params: list[object] = []
 
@@ -588,6 +736,15 @@ def _build_audit_where(
 
 
 def _fetch_audit_total(where_sql: str, params: list[object]) -> int:
+    """executes the fetch audit total operation.
+
+    @type where_sql: str
+    @param where_sql: The where_sql value used by this operation.
+    @type params: list[object]
+    @param params: The params value used by this operation.
+    @rtype: int
+    @returns: The result produced by this operation.
+    """
     count_row = fetch_all(
         f"""
         SELECT COUNT(*) AS total
@@ -600,6 +757,19 @@ def _fetch_audit_total(where_sql: str, params: list[object]) -> int:
 
 
 def _fetch_audit_rows(where_sql: str, params: list[object], limit: int, offset: int):
+    """executes the fetch audit rows operation.
+
+    @type where_sql: str
+    @param where_sql: The where_sql value used by this operation.
+    @type params: list[object]
+    @param params: The params value used by this operation.
+    @type limit: int
+    @param limit: The limit value used by this operation.
+    @type offset: int
+    @param offset: The offset value used by this operation.
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     return fetch_all(
         f"""
         SELECT id, actor_user_id, actor_username, action, resource_type, resource_id, result,
@@ -614,6 +784,13 @@ def _fetch_audit_rows(where_sql: str, params: list[object], limit: int, offset: 
 
 
 def _build_reports_student_filters(payload: ReportsStudentSearchIn):
+    """executes the build reports student filters operation.
+
+    @type payload: ReportsStudentSearchIn
+    @param payload: The payload value used by this operation.
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     params = []
     where_clauses = []
     term = (payload.term or "").strip()
@@ -649,11 +826,25 @@ def _build_reports_student_filters(payload: ReportsStudentSearchIn):
 
 @app.get("/health")
 def health_check():
+    """executes the health check operation.
+
+    @type none: None
+    @param none: This operation does not require input parameters.
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     return {"status": "ok"}
 
 
 @app.get("/news/birthdays", response_model=list[BirthdayNotificationRow])
 def news_birthdays(_: str = Depends(_require_auth)):
+    """executes the news birthdays operation.
+
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     rows = fetch_all(
         """
         SELECT s.name, s.belt, s.birthday, s.active
@@ -668,6 +859,15 @@ def news_birthdays(_: str = Depends(_require_auth)):
 
 @app.post("/reports/students/search", response_model=ReportsStudentSearchOut)
 def reports_students_search(payload: ReportsStudentSearchIn, _: str = Depends(_require_auth)):
+    """executes the reports students search operation.
+
+    @type payload: ReportsStudentSearchIn
+    @param payload: The payload value used by this operation.
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     where_sql, params = _build_reports_student_filters(payload)
     count_row = fetch_all(
         f"""
@@ -708,6 +908,15 @@ def reports_students_search(payload: ReportsStudentSearchIn, _: str = Depends(_r
 
 @app.post("/reports/students/export", response_model=list[ReportsStudentRow])
 def reports_students_export(payload: ReportsStudentSearchIn, _: str = Depends(_require_auth)):
+    """executes the reports students export operation.
+
+    @type payload: ReportsStudentSearchIn
+    @param payload: The payload value used by this operation.
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     where_sql, params = _build_reports_student_filters(payload)
     rows = fetch_all(
         f"""
@@ -735,6 +944,15 @@ def reports_students_export(payload: ReportsStudentSearchIn, _: str = Depends(_r
 
 @app.post("/auth/login", response_model=TokenResponse)
 def login(payload: LoginRequest, request: Request):
+    """executes the login operation.
+
+    @type payload: LoginRequest
+    @param payload: The payload value used by this operation.
+    @type request: Request
+    @param request: The request value used by this operation.
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     username = payload.username.strip()
     identity = _login_identity(username, request)
     ctx = build_request_context(request)
@@ -835,12 +1053,26 @@ def login(payload: LoginRequest, request: Request):
 
 @app.get("/auth/me", response_model=AuthUserOut)
 def auth_me(subject: str = Depends(_require_auth)):
+    """executes the auth me operation.
+
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = _get_user_by_subject(subject)
     return AuthUserOut.model_validate(row)
 
 
 @app.get("/users/me/preferences", response_model=UserPreferencesOut)
 def get_my_preferences(subject: str = Depends(_require_auth)):
+    """executes the get my preferences operation.
+
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     user = _get_user_by_subject(subject)
     row = fetch_one(
         """
@@ -867,6 +1099,15 @@ def upsert_my_preferences(
     payload: UserPreferencesIn,
     subject: str = Depends(_require_auth),
 ):
+    """executes the upsert my preferences operation.
+
+    @type payload: UserPreferencesIn
+    @param payload: The payload value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     user = _get_user_by_subject(subject)
     palette_light_json = json.dumps(payload.palette_light or {})
     palette_dark_json = json.dumps(payload.palette_dark or {})
@@ -902,6 +1143,13 @@ def upsert_my_preferences(
 
 @app.get("/users/list", response_model=list[ApiUserOut])
 def list_users(_: str = Depends(_require_admin)):
+    """executes the list users operation.
+
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     rows = fetch_all(
         """
         SELECT id, username, role, can_write, can_update, active, created_at
@@ -925,6 +1173,29 @@ def list_audit_logs(
     offset: int = Query(default=0, ge=0),
 ):
     # keep `subject` explicit so this endpoint is always protected by admin auth
+    """executes the list audit logs operation.
+
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @type date_from: str | None
+    @param date_from: The date_from value used by this operation (optional).
+    @type date_to: str | None
+    @param date_to: The date_to value used by this operation (optional).
+    @type actor_username: str
+    @param actor_username: The actor_username value used by this operation (optional).
+    @type action: str
+    @param action: The action value used by this operation (optional).
+    @type resource_type: str
+    @param resource_type: The resource_type value used by this operation (optional).
+    @type result: str
+    @param result: The result value used by this operation (optional).
+    @type limit: int
+    @param limit: The limit value used by this operation (optional).
+    @type offset: int
+    @param offset: The offset value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     _ = subject
     where_sql, params = _build_audit_where(
         date_from=date_from,
@@ -955,6 +1226,31 @@ def export_audit_logs(
     limit: int = Query(default=500, ge=1, le=5000),
     offset: int = Query(default=0, ge=0),
 ):
+    """executes the export audit logs operation.
+
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @type format: str
+    @param format: The format value used by this operation (optional).
+    @type date_from: str | None
+    @param date_from: The date_from value used by this operation (optional).
+    @type date_to: str | None
+    @param date_to: The date_to value used by this operation (optional).
+    @type actor_username: str
+    @param actor_username: The actor_username value used by this operation (optional).
+    @type action: str
+    @param action: The action value used by this operation (optional).
+    @type resource_type: str
+    @param resource_type: The resource_type value used by this operation (optional).
+    @type result: str
+    @param result: The result value used by this operation (optional).
+    @type limit: int
+    @param limit: The limit value used by this operation (optional).
+    @type offset: int
+    @param offset: The offset value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     _ = subject
     output_format = format.strip().lower()
     if output_format not in {"csv", "json"}:
@@ -1029,6 +1325,17 @@ def purge_audit_logs(
     retention_days: int = Query(default=API_AUDIT_RETENTION_DAYS, ge=1, le=3650),
     dry_run: bool = Query(default=True),
 ):
+    """executes the purge audit logs operation.
+
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @type retention_days: int
+    @param retention_days: The retention_days value used by this operation (optional).
+    @type dry_run: bool
+    @param dry_run: The dry_run value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     actor = _get_user_by_subject(subject)
     preview = fetch_one(
         """
@@ -1080,6 +1387,15 @@ def purge_audit_logs(
 
 @app.post("/users/create", response_model=ApiUserOut, status_code=201)
 def create_user(payload: ApiUserCreateIn, subject: str = Depends(_require_admin)):
+    """executes the create user operation.
+
+    @type payload: ApiUserCreateIn
+    @param payload: The payload value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     username = payload.username.strip()
     existing = fetch_one(
         "SELECT id FROM t_api_users WHERE username = %s",
@@ -1117,6 +1433,17 @@ def batch_create_users(
     subject: str = Depends(_require_admin),
     dry_run: bool = Query(default=False),
 ):
+    """executes the batch create users operation.
+
+    @type payload: ApiUserBatchCreateIn
+    @param payload: The payload value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @type dry_run: bool
+    @param dry_run: The dry_run value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     raw_usernames = [item.username.strip() for item in payload.users]
     existing_rows = fetch_all(
         """
@@ -1220,6 +1547,17 @@ def batch_create_users(
 
 @app.put("/users/{user_id}", response_model=ApiUserOut)
 def update_user(user_id: int, payload: ApiUserUpdateIn, subject: str = Depends(_require_admin)):
+    """executes the update user operation.
+
+    @type user_id: int
+    @param user_id: The user_id value used by this operation.
+    @type payload: ApiUserUpdateIn
+    @param payload: The payload value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     existing = fetch_one(
         """
         SELECT id, username, role, can_write, can_update, active, created_at
@@ -1295,6 +1633,17 @@ def reset_user_password(
     payload: ApiUserPasswordResetIn,
     subject: str = Depends(_require_admin),
 ):
+    """executes the reset user password operation.
+
+    @type user_id: int
+    @param user_id: The user_id value used by this operation.
+    @type payload: ApiUserPasswordResetIn
+    @param payload: The payload value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         """
         UPDATE t_api_users
@@ -1325,6 +1674,21 @@ def list_students(
     status_filter: str = Query(default="Active"),
     name_query: str = Query(default=""),
 ):
+    """executes the list students operation.
+
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @type limit: int
+    @param limit: The limit value used by this operation (optional).
+    @type offset: int
+    @param offset: The offset value used by this operation (optional).
+    @type status_filter: str
+    @param status_filter: The status_filter value used by this operation (optional).
+    @type name_query: str
+    @param name_query: The name_query value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     where_clauses = []
     params: list[object] = []
     if status_filter == "Active":
@@ -1360,6 +1724,17 @@ def students_count(
     status_filter: str = Query(default="Active"),
     name_query: str = Query(default=""),
 ):
+    """executes the students count operation.
+
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @type status_filter: str
+    @param status_filter: The status_filter value used by this operation (optional).
+    @type name_query: str
+    @param name_query: The name_query value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     where_clauses = []
     params: list[object] = []
     if status_filter == "Active":
@@ -1384,6 +1759,13 @@ def students_count(
 
 @app.get("/locations/active", response_model=list[LocationOut])
 def active_locations(_: str = Depends(_require_auth)):
+    """executes the active locations operation.
+
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     rows = fetch_all(
         """
         SELECT id, name
@@ -1397,6 +1779,13 @@ def active_locations(_: str = Depends(_require_auth)):
 
 @app.get("/locations/list", response_model=list[LocationOut])
 def list_locations(_: str = Depends(_require_auth)):
+    """executes the list locations operation.
+
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     rows = fetch_all(
         """
         SELECT id, name, phone, address, active
@@ -1409,6 +1798,15 @@ def list_locations(_: str = Depends(_require_auth)):
 
 @app.post("/locations/create", response_model=LocationCreateResponse, status_code=201)
 def create_location(payload: LocationIn, subject: str = Depends(_require_write_access)):
+    """executes the create location operation.
+
+    @type payload: LocationIn
+    @param payload: The payload value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         """
         INSERT INTO t_locations (name, phone, address)
@@ -1437,6 +1835,17 @@ def update_location(
     payload: LocationIn,
     subject: str = Depends(_require_update_access),
 ):
+    """executes the update location operation.
+
+    @type location_id: int
+    @param location_id: The location_id value used by this operation.
+    @type payload: LocationIn
+    @param payload: The payload value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         """
         UPDATE t_locations
@@ -1465,6 +1874,15 @@ def update_location(
 
 @app.post("/locations/{location_id}/deactivate")
 def deactivate_location(location_id: int, subject: str = Depends(_require_update_access)):
+    """executes the deactivate location operation.
+
+    @type location_id: int
+    @param location_id: The location_id value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         """
         UPDATE t_locations SET active=false, updated_at=now()
@@ -1487,6 +1905,15 @@ def deactivate_location(location_id: int, subject: str = Depends(_require_update
 
 @app.post("/locations/{location_id}/reactivate")
 def reactivate_location(location_id: int, subject: str = Depends(_require_update_access)):
+    """executes the reactivate location operation.
+
+    @type location_id: int
+    @param location_id: The location_id value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         """
         UPDATE t_locations SET active=true, updated_at=now()
@@ -1509,6 +1936,13 @@ def reactivate_location(location_id: int, subject: str = Depends(_require_update
 
 @app.get("/teachers/list", response_model=list[TeacherOut])
 def list_teachers(_: str = Depends(_require_auth)):
+    """executes the list teachers operation.
+
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     rows = fetch_all(
         """
         SELECT id, name, sex, email, phone, belt, hire_date, active
@@ -1521,6 +1955,13 @@ def list_teachers(_: str = Depends(_require_auth)):
 
 @app.get("/teachers/active", response_model=list[IdNameOut])
 def active_teachers(_: str = Depends(_require_auth)):
+    """executes the active teachers operation.
+
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     rows = fetch_all(
         """
         SELECT id, name
@@ -1534,6 +1975,15 @@ def active_teachers(_: str = Depends(_require_auth)):
 
 @app.post("/teachers/create", response_model=TeacherCreateResponse, status_code=201)
 def create_teacher(payload: TeacherIn, subject: str = Depends(_require_write_access)):
+    """executes the create teacher operation.
+
+    @type payload: TeacherIn
+    @param payload: The payload value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         """
         INSERT INTO public.t_coaches (name, sex, email, phone, belt, hire_date)
@@ -1565,6 +2015,17 @@ def update_teacher(
     payload: TeacherIn,
     subject: str = Depends(_require_update_access),
 ):
+    """executes the update teacher operation.
+
+    @type teacher_id: int
+    @param teacher_id: The teacher_id value used by this operation.
+    @type payload: TeacherIn
+    @param payload: The payload value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         """
         UPDATE public.t_coaches
@@ -1596,6 +2057,15 @@ def update_teacher(
 
 @app.post("/teachers/{teacher_id}/deactivate")
 def deactivate_teacher(teacher_id: int, subject: str = Depends(_require_update_access)):
+    """executes the deactivate teacher operation.
+
+    @type teacher_id: int
+    @param teacher_id: The teacher_id value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         """
         UPDATE public.t_coaches
@@ -1619,6 +2089,15 @@ def deactivate_teacher(teacher_id: int, subject: str = Depends(_require_update_a
 
 @app.post("/teachers/{teacher_id}/reactivate")
 def reactivate_teacher(teacher_id: int, subject: str = Depends(_require_update_access)):
+    """executes the reactivate teacher operation.
+
+    @type teacher_id: int
+    @param teacher_id: The teacher_id value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         """
         UPDATE public.t_coaches
@@ -1642,6 +2121,13 @@ def reactivate_teacher(teacher_id: int, subject: str = Depends(_require_update_a
 
 @app.get("/classes/list", response_model=list[ClassOut])
 def list_classes(_: str = Depends(_require_auth)):
+    """executes the list classes operation.
+
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     rows = fetch_all(
         """
         SELECT c.id, c.name, c.belt_level, c.coach_id, c.duration_min, c.active, t.name AS coach_name
@@ -1655,6 +2141,13 @@ def list_classes(_: str = Depends(_require_auth)):
 
 @app.get("/classes/active", response_model=list[IdNameOut])
 def active_classes(_: str = Depends(_require_auth)):
+    """executes the active classes operation.
+
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     rows = fetch_all(
         """
         SELECT id, name
@@ -1668,6 +2161,15 @@ def active_classes(_: str = Depends(_require_auth)):
 
 @app.post("/classes/create", response_model=IdNameOut, status_code=201)
 def create_class(payload: ClassIn, _: str = Depends(_require_write_access)):
+    """executes the create class operation.
+
+    @type payload: ClassIn
+    @param payload: The payload value used by this operation.
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         """
         INSERT INTO t_classes (name, belt_level, coach_id, duration_min)
@@ -1681,6 +2183,17 @@ def create_class(payload: ClassIn, _: str = Depends(_require_write_access)):
 
 @app.put("/classes/{class_id}", response_model=IdNameOut)
 def update_class(class_id: int, payload: ClassIn, _: str = Depends(_require_update_access)):
+    """executes the update class operation.
+
+    @type class_id: int
+    @param class_id: The class_id value used by this operation.
+    @type payload: ClassIn
+    @param payload: The payload value used by this operation.
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         """
         UPDATE t_classes
@@ -1697,6 +2210,15 @@ def update_class(class_id: int, payload: ClassIn, _: str = Depends(_require_upda
 
 @app.post("/classes/{class_id}/deactivate")
 def deactivate_class(class_id: int, _: str = Depends(_require_update_access)):
+    """executes the deactivate class operation.
+
+    @type class_id: int
+    @param class_id: The class_id value used by this operation.
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         "UPDATE t_classes SET active=false WHERE id=%s RETURNING id",
         (class_id,),
@@ -1708,6 +2230,15 @@ def deactivate_class(class_id: int, _: str = Depends(_require_update_access)):
 
 @app.post("/classes/{class_id}/reactivate")
 def reactivate_class(class_id: int, _: str = Depends(_require_update_access)):
+    """executes the reactivate class operation.
+
+    @type class_id: int
+    @param class_id: The class_id value used by this operation.
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         "UPDATE t_classes SET active=true WHERE id=%s RETURNING id",
         (class_id,),
@@ -1719,6 +2250,13 @@ def reactivate_class(class_id: int, _: str = Depends(_require_update_access)):
 
 @app.get("/sessions/list", response_model=list[SessionOut])
 def list_sessions(_: str = Depends(_require_auth)):
+    """executes the list sessions operation.
+
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     rows = fetch_all(
         """
         SELECT cs.id, cs.class_id, c.name AS class_name, cs.session_date, cs.start_time::text, cs.end_time::text,
@@ -1734,6 +2272,15 @@ def list_sessions(_: str = Depends(_require_auth)):
 
 @app.post("/sessions/create", response_model=IdNameOut, status_code=201)
 def create_session(payload: SessionIn, subject: str = Depends(_require_write_access)):
+    """executes the create session operation.
+
+    @type payload: SessionIn
+    @param payload: The payload value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         """
         INSERT INTO t_class_sessions (class_id, session_date, start_time, end_time, location_id)
@@ -1764,6 +2311,17 @@ def update_session(
     payload: SessionIn,
     subject: str = Depends(_require_update_access),
 ):
+    """executes the update session operation.
+
+    @type session_id: int
+    @param session_id: The session_id value used by this operation.
+    @type payload: SessionIn
+    @param payload: The payload value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         """
         UPDATE t_class_sessions
@@ -1794,6 +2352,15 @@ def update_session(
 
 @app.post("/sessions/{session_id}/cancel")
 def cancel_session(session_id: int, subject: str = Depends(_require_update_access)):
+    """executes the cancel session operation.
+
+    @type session_id: int
+    @param session_id: The session_id value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         "UPDATE t_class_sessions SET cancelled=true WHERE id=%s RETURNING id",
         (session_id,),
@@ -1812,6 +2379,15 @@ def cancel_session(session_id: int, subject: str = Depends(_require_update_acces
 
 @app.post("/sessions/{session_id}/restore")
 def restore_session(session_id: int, subject: str = Depends(_require_update_access)):
+    """executes the restore session operation.
+
+    @type session_id: int
+    @param session_id: The session_id value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         "UPDATE t_class_sessions SET cancelled=false WHERE id=%s RETURNING id",
         (session_id,),
@@ -1830,6 +2406,15 @@ def restore_session(session_id: int, subject: str = Depends(_require_update_acce
 
 @app.post("/attendance/register")
 def register_attendance(payload: AttendanceRegisterIn, _: str = Depends(_require_write_access)):
+    """executes the register attendance operation.
+
+    @type payload: AttendanceRegisterIn
+    @param payload: The payload value used by this operation.
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     execute(
         """
         INSERT INTO t_attendance (session_id, student_id, status, checkin_source)
@@ -1848,6 +2433,15 @@ def register_attendance(payload: AttendanceRegisterIn, _: str = Depends(_require
 
 @app.get("/attendance/by-session/{session_id}", response_model=list[AttendanceRow])
 def attendance_by_session(session_id: int, _: str = Depends(_require_auth)):
+    """executes the attendance by session operation.
+
+    @type session_id: int
+    @param session_id: The session_id value used by this operation.
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     rows = fetch_all(
         """
         SELECT st.name AS c1, a.status AS c2, a.checkin_time::text AS c3
@@ -1863,6 +2457,15 @@ def attendance_by_session(session_id: int, _: str = Depends(_require_auth)):
 
 @app.get("/attendance/by-student/{student_id}", response_model=list[AttendanceRow])
 def attendance_by_student(student_id: int, _: str = Depends(_require_auth)):
+    """executes the attendance by student operation.
+
+    @type student_id: int
+    @param student_id: The student_id value used by this operation.
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     rows = fetch_all(
         """
         SELECT c.name AS c1, cs.session_date::text AS c2, a.status AS c3
@@ -1882,6 +2485,15 @@ def create_student(
     payload: StudentCreateRequest,
     subject: str = Depends(_require_write_access),
 ):
+    """executes the create student operation.
+
+    @type payload: StudentCreateRequest
+    @param payload: The payload value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     sex = _normalize_sex(payload.sex)
     row = execute_returning_one(
         """
@@ -1933,6 +2545,17 @@ def batch_create_students(
     subject: str = Depends(_require_write_access),
     dry_run: bool = Query(default=False),
 ):
+    """executes the batch create students operation.
+
+    @type payload: StudentBatchCreateIn
+    @param payload: The payload value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @type dry_run: bool
+    @param dry_run: The dry_run value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     created = 0
     errors = 0
     results: list[StudentBatchCreateResult] = []
@@ -2032,6 +2655,15 @@ def batch_create_students(
 
 @app.get("/students/{student_id}", response_model=StudentDetailOut)
 def get_student(student_id: int, _: str = Depends(_require_auth)):
+    """executes the get student operation.
+
+    @type student_id: int
+    @param student_id: The student_id value used by this operation.
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     rows = fetch_all(
         """
         SELECT s.id, s.name, s.sex, s.direction, s.postalcode, s.belt, s.email, s.phone, s.phone2,
@@ -2055,6 +2687,17 @@ def update_student(
     payload: StudentUpdateRequest,
     subject: str = Depends(_require_update_access),
 ):
+    """executes the update student operation.
+
+    @type student_id: int
+    @param student_id: The student_id value used by this operation.
+    @type payload: StudentUpdateRequest
+    @param payload: The payload value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     sex = _normalize_sex(payload.sex)
     row = execute_returning_one(
         """
@@ -2104,6 +2747,15 @@ def update_student(
 
 @app.post("/students/{student_id}/deactivate")
 def deactivate_student(student_id: int, subject: str = Depends(_require_update_access)):
+    """executes the deactivate student operation.
+
+    @type student_id: int
+    @param student_id: The student_id value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         """
         UPDATE t_students
@@ -2127,6 +2779,15 @@ def deactivate_student(student_id: int, subject: str = Depends(_require_update_a
 
 @app.post("/students/{student_id}/reactivate")
 def reactivate_student(student_id: int, subject: str = Depends(_require_update_access)):
+    """executes the reactivate student operation.
+
+    @type student_id: int
+    @param student_id: The student_id value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     row = execute_returning_one(
         """
         UPDATE t_students
@@ -2150,6 +2811,15 @@ def reactivate_student(student_id: int, subject: str = Depends(_require_update_a
 
 @app.get("/students/{student_id}/followups", response_model=StudentFollowupRoadmapOut)
 def list_student_followups(student_id: int, _: str = Depends(_require_auth)):
+    """executes the list student followups operation.
+
+    @type student_id: int
+    @param student_id: The student_id value used by this operation.
+    @type _: str
+    @param _: The _ value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     student = _student_exists(student_id)
     rows = fetch_all(
         """
@@ -2208,6 +2878,17 @@ def upsert_student_followup(
     payload: StudentFollowupUpsertIn,
     subject: str = Depends(_require_update_access),
 ):
+    """executes the upsert student followup operation.
+
+    @type student_id: int
+    @param student_id: The student_id value used by this operation.
+    @type payload: StudentFollowupUpsertIn
+    @param payload: The payload value used by this operation.
+    @type subject: str
+    @param subject: The subject value used by this operation (optional).
+    @rtype: Any
+    @returns: The result produced by this operation.
+    """
     _student_exists(student_id)
     row = execute_returning_one(
         """
