@@ -10,6 +10,7 @@ from datetime import date, datetime, timezone
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from psycopg2 import errors as pg_errors
 
 from backend.audit import (
     audit_log_event,
@@ -192,6 +193,38 @@ def _run_startup_migrations():
             REFERENCES t_locations(id);
         EXCEPTION
             WHEN duplicate_object THEN NULL;
+        END $$;
+        """
+    )
+    execute(
+        """
+        DO $$
+        DECLARE
+            legacy_unique record;
+        BEGIN
+            FOR legacy_unique IN
+                SELECT c.conname
+                FROM pg_constraint c
+                JOIN pg_class t ON t.oid = c.conrelid
+                JOIN pg_namespace n ON n.oid = t.relnamespace
+                WHERE n.nspname = 'public'
+                  AND t.relname = 't_class_sessions'
+                  AND c.contype = 'u'
+                  AND pg_get_constraintdef(c.oid) = 'UNIQUE (class_id, session_date, start_time)'
+            LOOP
+                EXECUTE format(
+                    'ALTER TABLE public.t_class_sessions DROP CONSTRAINT %%I',
+                    legacy_unique.conname
+                );
+            END LOOP;
+
+            BEGIN
+                ALTER TABLE public.t_class_sessions
+                ADD CONSTRAINT uq_class_session_location
+                UNIQUE (class_id, session_date, start_time, location_id);
+            EXCEPTION
+                WHEN duplicate_object OR duplicate_table THEN NULL;
+            END;
         END $$;
         """
     )
@@ -509,6 +542,12 @@ def _normalize_sex(value: str) -> str:
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         detail="sex must be one of: M, F, NA",
     )
+
+
+def _is_unique_constraint_error(exc: Exception, *constraint_names: str) -> bool:
+    diag = getattr(exc, "diag", None)
+    name = getattr(diag, "constraint_name", "") if diag else ""
+    return bool(name and name in constraint_names)
 
 
 def _require_auth(
@@ -2281,20 +2320,28 @@ def create_session(payload: SessionIn, subject: str = Depends(_require_write_acc
     @rtype: Any
     @returns: The result produced by this operation.
     """
-    row = execute_returning_one(
-        """
-        INSERT INTO t_class_sessions (class_id, session_date, start_time, end_time, location_id)
-        VALUES (%s, %s, %s, %s, %s)
-        RETURNING id, id::text AS name
-        """,
-        (
-            payload.class_id,
-            payload.session_date,
-            payload.start_time.strip(),
-            payload.end_time.strip(),
-            payload.location_id,
-        ),
-    )
+    try:
+        row = execute_returning_one(
+            """
+            INSERT INTO t_class_sessions (class_id, session_date, start_time, end_time, location_id)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id, id::text AS name
+            """,
+            (
+                payload.class_id,
+                payload.session_date,
+                payload.start_time.strip(),
+                payload.end_time.strip(),
+                payload.location_id,
+            ),
+        )
+    except pg_errors.UniqueViolation as exc:
+        if _is_unique_constraint_error(exc, "uq_class_session_location", "uq_class_session"):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A session with the same class, date and start time already exists for this location",
+            ) from exc
+        raise
     _audit_cud(
         subject=subject,
         action="sessions.create",
@@ -2322,22 +2369,30 @@ def update_session(
     @rtype: Any
     @returns: The result produced by this operation.
     """
-    row = execute_returning_one(
-        """
-        UPDATE t_class_sessions
-        SET class_id=%s, session_date=%s, start_time=%s, end_time=%s, location_id=%s
-        WHERE id=%s
-        RETURNING id, id::text AS name
-        """,
-        (
-            payload.class_id,
-            payload.session_date,
-            payload.start_time.strip(),
-            payload.end_time.strip(),
-            payload.location_id,
-            session_id,
-        ),
-    )
+    try:
+        row = execute_returning_one(
+            """
+            UPDATE t_class_sessions
+            SET class_id=%s, session_date=%s, start_time=%s, end_time=%s, location_id=%s
+            WHERE id=%s
+            RETURNING id, id::text AS name
+            """,
+            (
+                payload.class_id,
+                payload.session_date,
+                payload.start_time.strip(),
+                payload.end_time.strip(),
+                payload.location_id,
+                session_id,
+            ),
+        )
+    except pg_errors.UniqueViolation as exc:
+        if _is_unique_constraint_error(exc, "uq_class_session_location", "uq_class_session"):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A session with the same class, date and start time already exists for this location",
+            ) from exc
+        raise
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
     _audit_cud(

@@ -1,20 +1,26 @@
-Run pyinstaller --clean --noconfirm gui.spec
-192 INFO: PyInstaller: 6.18.0, contrib hooks: 2026.1
-192 INFO: Python: 3.11.9
-200 INFO: Platform: Windows-10-10.0.26100-SP0
-200 INFO: Python environment: C:\hostedtoolcache\windows\Python\3.11.9\x64
-202 INFO: Removing temporary files and cleaning cache in C:\Users\runneradmin\AppData\Local\pyinstaller
-203 INFO: Module search paths (PYTHONPATH):
-['C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\Scripts\\pyinstaller.exe',
- 'C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\python311.zip',
- 'C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\DLLs',
- 'C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\Lib',
- 'C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64',
- 'C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\Lib\\site-packages',
- 'C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\Lib\\site-packages\\win32',
- 'C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\Lib\\site-packages\\win32\\lib',
- 'C:\\hostedtoolcache\\windows\\Python\\3.11.9\\x64\\Lib\\site-packages\\Pythonwin',
- 'D:\\a\\cloudvienna\\cloudvienna']
-495 INFO: Appending 'datas' from .spec
-ERROR: Unable to find 'D:\\a\\cloudvienna\\cloudvienna\\app_settings.json' when adding binary and data files.
-Error: Process completed with exit code 1.
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Projects\cloudvienna\backend\main.py", line 480, in lifespan
+    _run_startup_migrations()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Projects\cloudvienna\backend\main.py", line 199, in _run_startup_migrations
+    execute(
+    ~~~~~~~^
+        """
+        ^^^
+    ...<28 lines>...
+        """
+        ^^^
+    )
+    ^
+  File "C:\Projects\cloudvienna\backend\db.py", line 54, in execute
+    cur.execute(query, params)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^
+psycopg2.errors.DuplicateTable: relation "uq_class_session_location" already exists
+CONTEXT:  SQL statement "ALTER TABLE public.t_class_sessions
+                ADD CONSTRAINT uq_class_session_location
+                UNIQUE (class_id, session_date, start_time, location_id)"
+PL/pgSQL function inline_code_block line 22 at SQL statement
+
+
+ERROR:    Application startup failed. Exiting.

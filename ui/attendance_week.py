@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import date, datetime, timedelta
 
-from api_client import ApiError, list_sessions as api_list_sessions
+from api_client import ApiError, active_locations as api_active_locations, list_sessions as api_list_sessions
 from i18n import t
 from ui.local_app_settings import DEFAULT_CLASS_COLOR, get_class_color
 
@@ -37,14 +37,35 @@ def _sunday_week_start(d):
     return d - timedelta(days=days_since_sunday)
 
 
+def _as_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def build(tab_attendance_week, on_session_click=None):
     controls = ttk.Frame(tab_attendance_week)
     controls.pack(fill=tk.X, pady=(0, 8))
 
     week_start = {"value": _sunday_week_start(date.today())}
+    all_locations_label = t("label.all_locations")
+    location_var = tk.StringVar(value=all_locations_label)
+    location_map = {all_locations_label: None}
+    location_header_var = tk.StringVar(value="")
 
     week_label = ttk.Label(controls, text="")
     week_label.pack(side=tk.LEFT)
+
+    ttk.Label(controls, text=t("label.location")).pack(side=tk.LEFT, padx=(14, 6))
+    location_cb = ttk.Combobox(
+        controls,
+        textvariable=location_var,
+        state="readonly",
+        width=30,
+        values=[all_locations_label],
+    )
+    location_cb.pack(side=tk.LEFT)
 
     btn_prev = ttk.Button(controls, text=t("button.prev"))
     btn_prev.pack(side=tk.RIGHT, padx=(6, 0))
@@ -57,6 +78,9 @@ def build(tab_attendance_week, on_session_click=None):
 
     btn_refresh = ttk.Button(controls, text=t("button.refresh"))
     btn_refresh.pack(side=tk.RIGHT)
+
+    location_header = ttk.Label(tab_attendance_week, textvariable=location_header_var)
+    location_header.pack(fill=tk.X, pady=(0, 6))
 
     calendar_frame = ttk.Frame(tab_attendance_week)
     calendar_frame.pack(fill=tk.BOTH, expand=True)
@@ -85,6 +109,13 @@ def build(tab_attendance_week, on_session_click=None):
         t("label.day_sat"),
     ]
     event_blocks = []
+
+    def _selected_location_id():
+        return location_map.get(location_var.get())
+
+    def _refresh_location_header():
+        selected_location = location_var.get() or all_locations_label
+        location_header_var.set(f"{t('label.location')}: {selected_location}")
 
     def _format_week_label(start_date):
         return t("label.week_of", date=start_date.isoformat())
@@ -257,11 +288,15 @@ def build(tab_attendance_week, on_session_click=None):
     def load_week():
         _draw_grid()
         week_label.config(text=_format_week_label(week_start["value"]))
+        _refresh_location_header()
         try:
             rows = api_list_sessions()
         except ApiError as exc:
             messagebox.showerror("API error", str(exc))
             rows = []
+        selected_location_id = _selected_location_id()
+        if selected_location_id is not None:
+            rows = [r for r in rows if _as_int(r.get("location_id")) == int(selected_location_id)]
         _draw_events(rows)
 
     def _prev_week():
@@ -281,6 +316,31 @@ def build(tab_attendance_week, on_session_click=None):
     btn_today.config(command=_today_week)
     btn_refresh.config(command=load_week)
 
+    def _refresh_locations():
+        selected = location_var.get()
+        location_map.clear()
+        location_map[all_locations_label] = None
+        options = [all_locations_label]
+        try:
+            rows = api_active_locations()
+        except ApiError as exc:
+            messagebox.showerror("API error", str(exc))
+            rows = []
+        for r in rows:
+            loc_id = _as_int(r.get("id"))
+            name = str(r.get("name") or "").strip()
+            if loc_id is None or not name:
+                continue
+            label = f"{name} (#{loc_id})"
+            location_map[label] = loc_id
+            options.append(label)
+        location_cb["values"] = options
+        if selected in location_map:
+            location_var.set(selected)
+        else:
+            location_var.set(all_locations_label)
+        _refresh_location_header()
+
     def _on_mousewheel(event):
         delta = -1 * int(event.delta / 120) if event.delta else 0
         if delta:
@@ -288,5 +348,10 @@ def build(tab_attendance_week, on_session_click=None):
 
     canvas.bind("<MouseWheel>", _on_mousewheel)
     canvas.bind("<Button-1>", _on_canvas_click)
+    location_cb.bind("<<ComboboxSelected>>", lambda event: load_week())
+    location_cb.bind("<Button-1>", lambda event: _refresh_locations())
+
+    _refresh_locations()
+    _refresh_location_header()
 
     return {"load_week": load_week}

@@ -49,15 +49,23 @@ def fetch_one(query: str, params=()):
 
 def execute(query: str, params=()):
     with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(query, params)
-        conn.commit()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
 
 
 def execute_returning_one(query: str, params=()):
     with get_conn() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(query, params)
-            row = cur.fetchone()
-        conn.commit()
-        return row
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(query, params)
+                row = cur.fetchone()
+            conn.commit()
+            return row
+        except Exception:
+            conn.rollback()
+            raise
