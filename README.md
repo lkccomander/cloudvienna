@@ -56,9 +56,10 @@ pytest -q
 ```
 
 ## Environment and Config
-- Backend env source of truth: `backend/.env*` (`.env.dev`, `.env.prod`, `.env.cloud`).
+- Backend env source of truth: `backend/.env*` (`.env.dev`, `.env.stage`, `.env.demo`, `.env.production`).
 - Desktop/client settings: `app_settings.json`.
-- In production-like environments (`APP_ENV=prod|cloud`), backend startup enforces strong JWT/admin credentials.
+- In production-like environments (`APP_ENV=stage|demo|production`), backend startup enforces strong JWT/admin credentials.
+- Legacy aliases are still accepted: `APP_ENV=prod|cloud`.
 
 ## CI and Release
 - CI: `.github/workflows/ci.yml`
@@ -71,6 +72,12 @@ pytest -q
 ## Security
 - Production and cybersecurity checklist:
   - `docs/PROD_SECURITY_CHECKLIST.md`
+
+## Recent Updates
+- Attendance Week now supports filtering by active location and shows selected location in the calendar header.
+- Session scheduling uniqueness is location-aware:
+  - same class/date/start time is allowed across different locations.
+  - same class/date/start time in the same location returns `409 Conflict`.
 
 ## Star History
 <a href="https://www.star-history.com/#lkccomander/bjjvienna.git&type=date&legend=top-left">

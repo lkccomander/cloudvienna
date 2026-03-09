@@ -16,6 +16,16 @@
 4. Legacy direct DB path (`db.py`) still exists in parts of the desktop stack for compatibility.
 5. Results are rendered in Tk widgets such as `Treeview`, charts, and forms.
 
+## Attendance Week tab
+- UI module: `ui/attendance_week.py`.
+- Data sources:
+  - `GET /sessions/list` for calendar events.
+  - `GET /locations/active` for location filter options.
+- Behavior:
+  - Week view supports location filtering via combobox.
+  - Calendar header shows the currently selected location.
+  - Events are painted only for the selected location (or all locations when no filter).
+
 ## Key modules
 - `gui.py`: App entry point and Tk notebook/tab wiring.
 - `ui/`: Feature tabs (students, teachers, locations, sessions, attendance, reports, settings, about).
@@ -32,7 +42,7 @@
 
 ## Data access
 - Backend data access uses `backend/db.py` with a PostgreSQL pool.
-- Backend env source of truth is `backend/.env*` (`.env.dev/.env.prod/.env.cloud`).
+- Backend env source of truth is `backend/.env*` (`.env.dev/.env.stage/.env.demo/.env.production`).
 - Desktop direct DB access via `db.py` is legacy-compatible but no longer the target architecture.
 
 ## DB schema summary (inferred from UI queries)
@@ -46,6 +56,10 @@
   `location_id` (FK to `t_locations`), `cancelled`.
 - `t_attendance`: `session_id` (FK to `t_class_sessions`), `student_id` (FK to `t_students`),
   `status`, `checkin_source`, `checkin_time`.
+- Session uniqueness rule:
+  - Active uniqueness is location-aware: `UNIQUE (class_id, session_date, start_time, location_id)`.
+  - Same class/date/start time is allowed across different locations.
+  - Backend returns `409 Conflict` when the same class/date/start time is duplicated in the same location.
 
 ## Reports and exports
 - Reports search supports name, location, newsletter consent, and active/inactive filters with pagination.
@@ -55,7 +69,7 @@
 - Backend: `backend/.env*` controls DB/API runtime values (`APP_ENV` selects variant).
 - Desktop: `app_settings.json` stores API endpoint/credentials and user preferences.
 - `scripts/bootstrap_instance.py` writes both backend env and client settings for first-time setup.
-- In `prod/cloud`, backend startup fails fast when critical secrets are weak/default.
+- In `stage/demo/production`, backend startup fails fast when critical secrets are weak/default.
 
 ## Logging
 - `gui.py` configures error logging to `app.log` and the console.

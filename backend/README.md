@@ -52,6 +52,17 @@ Batch endpoints support dry run:
 - `POST /users/batch-create?dry_run=true`
 - `POST /students/batch-create?dry_run=true`
 
+## Sessions conflict rule
+
+- Session uniqueness is enforced by:
+  - `UNIQUE (class_id, session_date, start_time, location_id)`
+- Allowed:
+  - Same class/date/start time in different locations.
+- Rejected:
+  - Same class/date/start time in the same location.
+- Error response:
+  - `POST /sessions/create` and `PUT /sessions/{id}` return `409 Conflict` for same-location duplicates.
+
 ## Environment variables
 
 Set these before running:
@@ -81,7 +92,7 @@ Set these before running:
 uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Recommended (uses `backend/.env`):
+Recommended (uses `backend/.env` + `backend/.env.<env>`):
 
 ```bash
 python -m backend.run
@@ -113,11 +124,11 @@ Single script to initialize both backend environment and desktop client settings
 python3 scripts/bootstrap_instance.py --env dev
 ```
 
-For production/cloud (non-interactive example):
+For Railway stage/demo/production (non-interactive example):
 
 ```bash
 python3 scripts/bootstrap_instance.py \
-  --env prod \
+  --env production \
   --non-interactive \
   --db-host localhost \
   --db-port 5432 \
@@ -133,7 +144,7 @@ python3 scripts/bootstrap_instance.py \
 ```
 
 This writes:
-- backend env file: `backend/.env.dev` / `backend/.env.prod` / `backend/.env.cloud`
+- backend env file: `backend/.env.dev` / `backend/.env.stage` / `backend/.env.demo` / `backend/.env.production`
 - desktop client config: `app_settings.json` (`db` + `api` blocks)
 
 ## GUI -> API config
@@ -156,7 +167,8 @@ Notes:
 - Keep `verify_tls: true` in production.
 - For local self-signed certificates, either trust the cert in OS trust store or set `ca_file`.
 - Use `verify_tls: false` only for temporary local development.
-- In `APP_ENV=prod` or `APP_ENV=cloud`, API startup fails fast if `API_JWT_SECRET` is default/weak
+- In `APP_ENV=stage`, `APP_ENV=demo`, or `APP_ENV=production`, API startup fails fast if `API_JWT_SECRET` is default/weak
   or `API_ADMIN_PASSWORD` is default/weak.
+- Backward-compatible aliases are still accepted: `APP_ENV=prod|cloud`.
 - On first startup, the API bootstraps an admin user into `t_api_users` from
   `API_ADMIN_USER` and `API_ADMIN_PASSWORD` if that username does not exist yet.

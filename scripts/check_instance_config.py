@@ -14,12 +14,31 @@ BACKEND_DIR = ROOT_DIR / "backend"
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate cloudvienna runtime configuration.")
-    parser.add_argument("--env", choices=["dev", "prod", "cloud"], default="dev")
+    parser.add_argument(
+        "--env",
+        choices=["dev", "stage", "demo", "production", "prod", "cloud"],
+        default="dev",
+    )
     return parser.parse_args()
 
 
-def _env_variant(env_name: str) -> str:
-    return {"dev": ".env.dev", "prod": ".env.prod", "cloud": ".env.cloud"}.get(env_name, ".env")
+def _normalize_env(env_name: str) -> str:
+    return {"prod": "production", "cloud": "production"}.get(env_name, env_name)
+
+
+def _env_variants(env_name: str) -> list[str]:
+    normalized = _normalize_env(env_name)
+    variants = {
+        "dev": [".env.dev"],
+        "stage": [".env.stage"],
+        "demo": [".env.demo"],
+        "production": [".env.production"],
+    }.get(normalized, [".env"])
+    if env_name == "prod":
+        variants.append(".env.prod")
+    if env_name == "cloud":
+        variants.append(".env.cloud")
+    return variants
 
 
 def _parse_env_file(path: Path) -> dict[str, str]:
@@ -36,11 +55,8 @@ def _parse_env_file(path: Path) -> dict[str, str]:
 
 
 def _load_effective_env(env_name: str) -> tuple[dict[str, str], list[Path]]:
-    variant = _env_variant(env_name)
-    ordered = [
-        BACKEND_DIR / ".env",
-        BACKEND_DIR / variant,
-    ]
+    ordered = [BACKEND_DIR / ".env"]
+    ordered.extend(BACKEND_DIR / variant for variant in _env_variants(env_name))
     merged: dict[str, str] = {}
     present: list[Path] = []
     for env_file in ordered:
@@ -67,6 +83,7 @@ def _has_text(value: object) -> bool:
 
 def main() -> int:
     args = _parse_args()
+    effective_env = _normalize_env(args.env)
     env_values, env_files = _load_effective_env(args.env)
     settings = _load_settings()
     errors: list[str] = []
@@ -100,13 +117,13 @@ def main() -> int:
             if not _has_text(api_cfg.get(key)):
                 errors.append(f"app_settings.json api.{key} is required")
 
-    if args.env in {"prod", "cloud"}:
+    if effective_env in {"stage", "demo", "production"}:
         jwt_secret = str(env_values.get("API_JWT_SECRET", "")).strip()
         admin_password = str(env_values.get("API_ADMIN_PASSWORD", "")).strip()
         if jwt_secret == "CHANGE_ME_IN_ENV" or len(jwt_secret) < 32:
-            errors.append("API_JWT_SECRET must be non-default and >= 32 chars in prod/cloud")
+            errors.append("API_JWT_SECRET must be non-default and >= 32 chars in stage/demo/production")
         if admin_password == "change-me" or len(admin_password) < 12:
-            errors.append("API_ADMIN_PASSWORD must be non-default and >= 12 chars in prod/cloud")
+            errors.append("API_ADMIN_PASSWORD must be non-default and >= 12 chars in stage/demo/production")
 
     if errors:
         print("[CONFIG] Validation failed:")

@@ -15,6 +15,10 @@ BACKEND_DIR = ROOT_DIR / "backend"
 APP_SETTINGS_PATH = ROOT_DIR / "app_settings.json"
 ENV_FILE_BY_ENV = {
     "dev": BACKEND_DIR / ".env.dev",
+    "stage": BACKEND_DIR / ".env.stage",
+    "demo": BACKEND_DIR / ".env.demo",
+    "production": BACKEND_DIR / ".env.production",
+    # Backward-compatible aliases
     "prod": BACKEND_DIR / ".env.prod",
     "cloud": BACKEND_DIR / ".env.cloud",
 }
@@ -119,7 +123,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Configure backend (.env.<env>) and client (app_settings.json) for a new installation.",
     )
-    parser.add_argument("--env", choices=["dev", "prod", "cloud"], default="dev")
+    parser.add_argument("--env", choices=["dev", "stage", "demo", "production", "prod", "cloud"], default="dev")
     parser.add_argument("--non-interactive", action="store_true")
 
     parser.add_argument("--db-host")
@@ -150,13 +154,17 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     args = _parse_args()
     env_file = ENV_FILE_BY_ENV[args.env]
+    effective_env = {
+        "prod": "production",
+        "cloud": "production",
+    }.get(args.env, args.env)
     existing_settings = _load_app_settings(APP_SETTINGS_PATH)
     existing_db = existing_settings.get("db", {}) if isinstance(existing_settings.get("db"), dict) else {}
     existing_api = existing_settings.get("api", {}) if isinstance(existing_settings.get("api"), dict) else {}
 
     interactive = not args.non_interactive
     if interactive:
-        print(f"Bootstrapping environment '{args.env}'")
+        print(f"Bootstrapping environment '{effective_env}'")
         print(f"Backend env file: {env_file}")
         print(f"Client settings : {APP_SETTINGS_PATH}")
         print("")
@@ -172,7 +180,7 @@ def main() -> None:
     api_user = args.api_user or str(existing_api.get("username", args.api_admin_user))
     api_password = args.api_password or str(existing_api.get("password", ""))
     if args.api_verify_tls is None:
-        api_verify_tls = bool(existing_api.get("verify_tls", args.env != "dev"))
+        api_verify_tls = bool(existing_api.get("verify_tls", effective_env != "dev"))
     else:
         api_verify_tls = args.api_verify_tls == "true"
     api_ca_file = str(args.api_ca_file or existing_api.get("ca_file", "")).strip()
@@ -208,14 +216,14 @@ def main() -> None:
             api_jwt_secret = secrets.token_urlsafe(48)
 
     db_sslmode = _validate_sslmode(db_sslmode)
-    if args.env in {"prod", "cloud"}:
+    if effective_env in {"stage", "demo", "production"}:
         if len(api_jwt_secret.strip()) < 32:
-            raise RuntimeError("API_JWT_SECRET must have at least 32 characters in prod/cloud.")
+            raise RuntimeError("API_JWT_SECRET must have at least 32 characters in stage/demo/production.")
         if api_admin_password.strip() in {"", "change-me"} or len(api_admin_password.strip()) < 12:
-            raise RuntimeError("API_ADMIN_PASSWORD must be non-default and at least 12 characters in prod/cloud.")
+            raise RuntimeError("API_ADMIN_PASSWORD must be non-default and at least 12 characters in stage/demo/production.")
 
     env_payload = {
-        "APP_ENV": args.env,
+        "APP_ENV": effective_env,
         "DB_HOST": db_host.strip(),
         "DB_PORT": str(db_port),
         "DB_NAME": db_name.strip(),
@@ -257,7 +265,7 @@ def main() -> None:
     print(f"- Backend env file updated: {env_file}")
     print(f"- Client settings updated : {APP_SETTINGS_PATH}")
     print("Use this environment when running the app/API:")
-    print(f"  APP_ENV={args.env}")
+    print(f"  APP_ENV={effective_env}")
 
 
 if __name__ == "__main__":

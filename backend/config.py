@@ -9,19 +9,31 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).resolve().parent.parent
 BACKEND_DIR = Path(__file__).resolve().parent
 APP_SETTINGS_PATH = ROOT_DIR / "app_settings.json"
-APP_ENV = os.getenv("APP_ENV", "dev").strip().lower()
+_raw_app_env = os.getenv("APP_ENV", "dev").strip().lower()
+_env_aliases = {
+    "prod": "production",
+    "cloud": "production",
+}
+APP_ENV = _env_aliases.get(_raw_app_env, _raw_app_env)
 IN_RAILWAY = bool(os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_PROJECT_ID"))
 
 # Backend uses backend-scoped env files as single source of truth.
 _env_variant = {
     "dev": ".env.dev",
+    "stage": ".env.stage",
+    "demo": ".env.demo",
+    "production": ".env.production",
+}.get(APP_ENV, ".env")
+_legacy_env_variant = {
     "prod": ".env.prod",
     "cloud": ".env.cloud",
-}.get(APP_ENV, ".env")
+}.get(_raw_app_env)
 ENV_FILE_PRIORITY = [
     BACKEND_DIR / ".env",
     BACKEND_DIR / _env_variant,
 ]
+if _legacy_env_variant:
+    ENV_FILE_PRIORITY.append(BACKEND_DIR / _legacy_env_variant)
 if not IN_RAILWAY:
     for env_file in ENV_FILE_PRIORITY:
         # Local/dev mode: env files are the primary source of truth.
@@ -98,14 +110,14 @@ API_ADMIN_PASSWORD = os.getenv("API_ADMIN_PASSWORD", "change-me")
 
 
 def validate_security_settings() -> None:
-    if APP_ENV not in {"prod", "cloud"}:
+    if APP_ENV not in {"stage", "demo", "production", "prod", "cloud"}:
         return
 
     if API_JWT_SECRET == "CHANGE_ME_IN_ENV" or len(API_JWT_SECRET.strip()) < 32:
         raise RuntimeError(
-            "Invalid API_JWT_SECRET for production/cloud. Set a strong secret with at least 32 characters."
+            "Invalid API_JWT_SECRET for stage/demo/production. Set a strong secret with at least 32 characters."
         )
     if API_ADMIN_PASSWORD == "change-me" or len(API_ADMIN_PASSWORD.strip()) < 12:
         raise RuntimeError(
-            "Invalid API_ADMIN_PASSWORD for production/cloud. Set a non-default password with at least 12 characters."
+            "Invalid API_ADMIN_PASSWORD for stage/demo/production. Set a non-default password with at least 12 characters."
         )
