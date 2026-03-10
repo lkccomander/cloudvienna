@@ -1,6 +1,6 @@
 # BJJ Vienna
 
-![Build](https://img.shields.io/badge/build-failing-red)
+![Build](https://img.shields.io/badge/build-Online-green)
 ![Release](https://img.shields.io/badge/release-v1.0.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
