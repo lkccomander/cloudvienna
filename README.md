@@ -3,7 +3,7 @@
 ![Build](https://img.shields.io/badge/build-Online-green)
 ![Release](https://img.shields.io/badge/release-v1.0.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
-|[GitHub](https://img.shields.io/badge/github-repo-blue?logo=github)
+![GitHub](https://img.shields.io/badge/github-repo-blue?logo=github)
 
 Desktop application for BJJ academy operations with an optional FastAPI backend.
 
