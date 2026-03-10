@@ -1,5 +1,10 @@
 # BJJ Vienna
 
+![Build](https://img.shields.io/badge/build-failing-red)
+![Release](https://img.shields.io/badge/release-v2026.3.8-blue)
+![Discord](https://img.shields.io/discord/123456789?label=discord)
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
+
 Desktop application for BJJ academy operations with an optional FastAPI backend.
 
 ## What This Project Includes
