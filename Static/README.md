@@ -13,15 +13,16 @@ This folder contains a plain static site to collect student pre-registrations.
 
 ## Configure API URL
 
-Set `window.__API_BASE_URL__` in `index.html` before loading `app.js`.
+Do not hardcode the API URL in `index.html`.
 
-Example:
+This site now loads `config.js` before `app.js`. In Railway/Docker, `config.js` is generated at container startup from the `API_BASE_URL` environment variable using `Static/config.js.template`.
 
-```html
-<script>
-  window.__API_BASE_URL__ = "https://your-api.up.railway.app";
-</script>
-```
+Example Railway values:
+
+- Stage: `API_BASE_URL=https://backend-unique-tenderness-stage.up.railway.app`
+- Production: `API_BASE_URL=https://backend-unique-tenderness-production.up.railway.app`
+
+For local/manual static hosting, you can edit `Static/config.js` directly.
 
 ## Railway deployment model
 
@@ -52,5 +53,5 @@ Example:
 - Build error `nginx.conf.template not found`:
   - Ensure Docker `COPY` paths match build context (usually repo root on Railway).
 - Form submits but fails in browser:
-  - Confirm `window.__API_BASE_URL__` points to API domain.
+  - Confirm `API_BASE_URL` (or generated `config.js`) points to API domain.
   - Confirm backend `API_CORS_ALLOW_ORIGINS` includes static domain.
