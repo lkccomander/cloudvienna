@@ -15,12 +15,13 @@ This folder contains a plain static site to collect student pre-registrations.
 
 Do not hardcode the API URL in `index.html`.
 
-This site now loads `config.js` before `app.js`. In Railway/Docker, `config.js` is generated at container startup from the `API_BASE_URL` environment variable using `Static/config.js.template`.
+This site loads `config.js` before `app.js`.
 
-Example Railway values:
-
-- Stage: `API_BASE_URL=https://backend-unique-tenderness-stage.up.railway.app`
-- Production: `API_BASE_URL=https://backend-unique-tenderness-production.up.railway.app`
+Default behavior:
+- If `window.__API_BASE_URL__` is set in `config.js`, that value is used.
+- Otherwise, `app.js` infers the API from the site hostname:
+  - host contains `production` -> `https://backend-unique-tenderness-production.up.railway.app`
+  - host contains `stage` or `staging` -> `https://backend-unique-tenderness-stage.up.railway.app`
 
 For local/manual static hosting, you can edit `Static/config.js` directly.
 
