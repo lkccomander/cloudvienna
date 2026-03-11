@@ -18,6 +18,7 @@ Do not hardcode the API URL in `index.html`.
 This site loads `config.js` before `app.js`.
 
 Default behavior:
+- In Railway/Docker, `config.js` is generated at container startup from `API_BASE_URL`.
 - If `window.__API_BASE_URL__` is set in `config.js`, that value is used.
 - Otherwise, `app.js` infers the API from the site hostname:
   - host contains `production` -> `https://backend-unique-tenderness-production.up.railway.app`
