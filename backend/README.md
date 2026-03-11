@@ -5,6 +5,9 @@ This is the first backend scaffold to remove direct DB access from the GUI clien
 ## Endpoints
 
 - `GET /health`
+- `POST /public/pre-registrations`
+- `GET /pre-registrations/pending`
+- `POST /pre-registrations/import`
 - `POST /auth/login`
 - `GET /users/list` (admin)
 - `POST /users/create` (admin)
@@ -80,6 +83,10 @@ Set these before running:
 - `API_LOGIN_RATE_LIMIT_ATTEMPTS` (optional, default: `5`)
 - `API_LOGIN_RATE_LIMIT_WINDOW_SECONDS` (optional, default: `300`)
 - `API_LOGIN_BLOCK_SECONDS` (optional, default: `900`)
+- `API_PUBLIC_PRE_REG_RATE_LIMIT_ATTEMPTS` (optional, default: `10`)
+- `API_PUBLIC_PRE_REG_RATE_LIMIT_WINDOW_SECONDS` (optional, default: `300`)
+- `API_PUBLIC_PRE_REG_BLOCK_SECONDS` (optional, default: `900`)
+- `API_CORS_ALLOW_ORIGINS` (optional, comma-separated list for browser clients)
 - `API_HOST` (optional, default: `127.0.0.1`)
 - `API_PORT` (optional, default: `8000`)
 - `API_PROXY_HEADERS` (optional, default: `true`)

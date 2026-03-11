@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from psycopg2 import errors as pg_errors
@@ -22,9 +23,13 @@ from backend.config import (
     API_AUDIT_RETENTION_DAYS,
     API_ADMIN_PASSWORD,
     API_ADMIN_USER,
+    API_CORS_ALLOW_ORIGINS,
     API_LOGIN_BLOCK_SECONDS,
     API_LOGIN_RATE_LIMIT_ATTEMPTS,
     API_LOGIN_RATE_LIMIT_WINDOW_SECONDS,
+    API_PUBLIC_PRE_REG_BLOCK_SECONDS,
+    API_PUBLIC_PRE_REG_RATE_LIMIT_ATTEMPTS,
+    API_PUBLIC_PRE_REG_RATE_LIMIT_WINDOW_SECONDS,
     API_TOKEN_MINUTES,
     validate_security_settings,
 )
@@ -68,6 +73,12 @@ from backend.schemas import (
     StudentBatchCreateResult,
     StudentCreateResponse,
     StudentDetailOut,
+    WebPreRegistrationCreateOut,
+    WebPreRegistrationImportOut,
+    WebPreRegistrationImportResult,
+    WebPreRegistrationIn,
+    WebPreRegistrationListOut,
+    WebPreRegistrationRow,
     StudentFollowupOut,
     StudentFollowupRoadmapOut,
     StudentFollowupStageStatus,
@@ -88,6 +99,9 @@ auth_scheme = HTTPBearer(auto_error=True)
 _LOGIN_LOCK = threading.Lock()
 _LOGIN_FAILURES: dict[str, list[float]] = {}
 _LOGIN_BLOCKED_UNTIL: dict[str, float] = {}
+_PUBLIC_PRE_REG_LOCK = threading.Lock()
+_PUBLIC_PRE_REG_ATTEMPTS: dict[str, list[float]] = {}
+_PUBLIC_PRE_REG_BLOCKED_UNTIL: dict[str, float] = {}
 
 validate_security_settings()
 
@@ -153,6 +167,50 @@ def _clear_failed_logins(identity: str) -> None:
     with _LOGIN_LOCK:
         _LOGIN_FAILURES.pop(identity, None)
         _LOGIN_BLOCKED_UNTIL.pop(identity, None)
+
+
+def _is_public_pre_reg_blocked(identity: str) -> bool:
+    now = time.time()
+    with _PUBLIC_PRE_REG_LOCK:
+        blocked_until = _PUBLIC_PRE_REG_BLOCKED_UNTIL.get(identity, 0.0)
+        if blocked_until <= now:
+            _PUBLIC_PRE_REG_BLOCKED_UNTIL.pop(identity, None)
+            return False
+        return True
+
+
+def _record_public_pre_reg_attempt(identity: str) -> None:
+    now = time.time()
+    threshold = now - API_PUBLIC_PRE_REG_RATE_LIMIT_WINDOW_SECONDS
+    with _PUBLIC_PRE_REG_LOCK:
+        attempts = [ts for ts in _PUBLIC_PRE_REG_ATTEMPTS.get(identity, []) if ts >= threshold]
+        attempts.append(now)
+        _PUBLIC_PRE_REG_ATTEMPTS[identity] = attempts
+        if len(attempts) >= API_PUBLIC_PRE_REG_RATE_LIMIT_ATTEMPTS:
+            _PUBLIC_PRE_REG_BLOCKED_UNTIL[identity] = now + API_PUBLIC_PRE_REG_BLOCK_SECONDS
+            _PUBLIC_PRE_REG_ATTEMPTS.pop(identity, None)
+
+
+def _validate_pre_registration_payload(payload: WebPreRegistrationIn) -> tuple[str, str]:
+    if payload.website.strip():
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid submission")
+    if not payload.consent_privacy:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Privacy consent required")
+    name = payload.name.strip()
+    email = payload.email.strip()
+    if not name:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="name is required")
+    if not email:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="email is required")
+    if payload.is_minor:
+        guardian_name = (payload.guardian_name or "").strip()
+        guardian_email = (payload.guardian_email or "").strip()
+        if not guardian_name or not guardian_email:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="guardian_name and guardian_email are required for minors",
+            )
+    return name, email
 
 
 def _run_startup_migrations():
@@ -466,6 +524,59 @@ def _run_startup_migrations():
     execute(
         "CREATE INDEX IF NOT EXISTS idx_student_followups_call_date ON t_student_followups (call_date DESC)"
     )
+    execute(
+        """
+        CREATE TABLE IF NOT EXISTS t_web_pre_registrations (
+            id bigserial PRIMARY KEY,
+            name varchar(120) NOT NULL,
+            email varchar(150) NOT NULL,
+            sex varchar(10) NOT NULL,
+            phone varchar(50),
+            address varchar(250),
+            birthday date,
+            is_minor boolean NOT NULL DEFAULT false,
+            guardian_name varchar(120),
+            guardian_email varchar(150),
+            guardian_phone varchar(50),
+            newsletter_opt_in boolean NOT NULL DEFAULT true,
+            location_id integer REFERENCES t_locations(id) ON DELETE SET NULL,
+            notes text,
+            status varchar(20) NOT NULL DEFAULT 'pending',
+            imported_student_id integer REFERENCES t_students(id) ON DELETE SET NULL,
+            import_error text,
+            source_ip varchar(64),
+            user_agent text,
+            raw_payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+            consent_at timestamp NOT NULL DEFAULT now(),
+            imported_at timestamp,
+            created_at timestamp NOT NULL DEFAULT now(),
+            updated_at timestamp
+        )
+        """
+    )
+    execute(
+        """
+        ALTER TABLE t_web_pre_registrations
+        ADD COLUMN IF NOT EXISTS address varchar(250)
+        """
+    )
+    execute(
+        """
+        DO $$
+        BEGIN
+            ALTER TABLE t_web_pre_registrations DROP CONSTRAINT IF EXISTS ck_web_pre_reg_status;
+            ALTER TABLE t_web_pre_registrations
+                ADD CONSTRAINT ck_web_pre_reg_status
+                CHECK (status IN ('pending', 'imported', 'rejected'));
+        EXCEPTION
+            WHEN duplicate_object THEN NULL;
+        END $$;
+        """
+    )
+    execute(
+        "CREATE INDEX IF NOT EXISTS idx_web_pre_reg_status_created ON t_web_pre_registrations (status, created_at DESC)"
+    )
+    execute("CREATE INDEX IF NOT EXISTS idx_web_pre_reg_email ON t_web_pre_registrations (email)")
 
 
 @asynccontextmanager
@@ -482,6 +593,15 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="BJJ Vienna API", version="0.1.0", lifespan=lifespan)
+
+if API_CORS_ALLOW_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=API_CORS_ALLOW_ORIGINS,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
+    )
 
 
 @app.middleware("http")
@@ -873,6 +993,226 @@ def health_check():
     @returns: The result produced by this operation.
     """
     return {"status": "ok"}
+
+
+@app.post("/public/pre-registrations", response_model=WebPreRegistrationCreateOut, status_code=201)
+def create_web_pre_registration(payload: WebPreRegistrationIn, request: Request):
+    """Public endpoint for website registration intake."""
+    ip_address = request.client.host if request.client else "unknown"
+    identity = f"public_pre_reg@{ip_address}"
+    if _is_public_pre_reg_blocked(identity):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many attempts. Try again later.",
+        )
+    _record_public_pre_reg_attempt(identity)
+    name, email = _validate_pre_registration_payload(payload)
+    sex = _normalize_sex(payload.sex)
+    row = execute_returning_one(
+        """
+        INSERT INTO t_web_pre_registrations (
+            name, email, sex, phone, address, birthday, is_minor, guardian_name, guardian_email, guardian_phone,
+            newsletter_opt_in, location_id, notes, source_ip, user_agent, raw_payload, consent_at
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, now())
+        RETURNING id, status
+        """,
+        (
+            name,
+            email,
+            sex,
+            payload.phone,
+            payload.address,
+            payload.birthday,
+            payload.is_minor,
+            payload.guardian_name,
+            payload.guardian_email,
+            payload.guardian_phone,
+            payload.newsletter_opt_in,
+            payload.location_id,
+            payload.notes,
+            ip_address,
+            request.headers.get("user-agent", ""),
+            json.dumps(payload.model_dump(mode="json")),
+        ),
+    )
+    return WebPreRegistrationCreateOut.model_validate(row)
+
+
+@app.get("/pre-registrations/pending", response_model=WebPreRegistrationListOut)
+def list_pending_pre_registrations(
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+    _: str = Depends(_require_write_access),
+):
+    count_row = fetch_one(
+        """
+        SELECT COUNT(*) AS total
+        FROM t_web_pre_registrations
+        WHERE status = 'pending'
+        """
+    ) or {"total": 0}
+    rows = fetch_all(
+        """
+        SELECT id, name, email, sex, phone, birthday, is_minor, guardian_name, guardian_email, guardian_phone,
+               address, newsletter_opt_in, location_id, notes, status, imported_student_id, import_error, consent_at, created_at
+        FROM t_web_pre_registrations
+        WHERE status = 'pending'
+        ORDER BY created_at ASC
+        LIMIT %s OFFSET %s
+        """,
+        (limit, offset),
+    )
+    return WebPreRegistrationListOut(
+        total=int(count_row["total"]),
+        rows=[WebPreRegistrationRow.model_validate(row) for row in rows],
+    )
+
+
+@app.post("/pre-registrations/import", response_model=WebPreRegistrationImportOut)
+def import_pre_registrations(
+    limit: int = Query(default=200, ge=1, le=1000),
+    dry_run: bool = Query(default=True),
+    subject: str = Depends(_require_write_access),
+):
+    rows = fetch_all(
+        """
+        SELECT id, name, email, sex, phone, birthday, is_minor, guardian_name, guardian_email, guardian_phone,
+               address, newsletter_opt_in, location_id, notes
+        FROM t_web_pre_registrations
+        WHERE status = 'pending'
+        ORDER BY created_at ASC
+        LIMIT %s
+        """,
+        (limit,),
+    )
+    imported = 0
+    errors = 0
+    results: list[WebPreRegistrationImportResult] = []
+
+    for item in rows:
+        pre_registration_id = int(item["id"])
+        name = str(item["name"]).strip()
+        email = str(item["email"]).strip()
+        try:
+            sex = _normalize_sex(str(item["sex"]))
+            if dry_run:
+                results.append(
+                    WebPreRegistrationImportResult(
+                        pre_registration_id=pre_registration_id,
+                        name=name,
+                        email=email,
+                        status="would_import",
+                        detail="Dry-run only",
+                    )
+                )
+                imported += 1
+                continue
+
+            created_row = execute_returning_one(
+                """
+                INSERT INTO t_students (
+                    name, sex, email, phone, birthday, is_minor, guardian_name, guardian_email, guardian_phone,
+                    newsletter_opt_in, location_id, direction
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (
+                    name,
+                    sex,
+                    email,
+                    item.get("phone"),
+                    item.get("birthday"),
+                    item.get("is_minor"),
+                    item.get("guardian_name"),
+                    item.get("guardian_email"),
+                    item.get("guardian_phone"),
+                    item.get("newsletter_opt_in"),
+                    item.get("location_id"),
+                    item.get("address"),
+                ),
+            )
+            student_id = int(created_row["id"])
+            execute(
+                """
+                UPDATE t_web_pre_registrations
+                SET status = 'imported',
+                    imported_student_id = %s,
+                    import_error = NULL,
+                    imported_at = now(),
+                    updated_at = now()
+                WHERE id = %s
+                """,
+                (student_id, pre_registration_id),
+            )
+            imported += 1
+            results.append(
+                WebPreRegistrationImportResult(
+                    pre_registration_id=pre_registration_id,
+                    name=name,
+                    email=email,
+                    status="imported",
+                    student_id=student_id,
+                )
+            )
+        except HTTPException as exc:
+            errors += 1
+            if not dry_run:
+                execute(
+                    """
+                    UPDATE t_web_pre_registrations
+                    SET status = 'rejected',
+                        import_error = %s,
+                        updated_at = now()
+                    WHERE id = %s
+                    """,
+                    (str(exc.detail), pre_registration_id),
+                )
+            results.append(
+                WebPreRegistrationImportResult(
+                    pre_registration_id=pre_registration_id,
+                    name=name,
+                    email=email,
+                    status="error",
+                    detail=str(exc.detail),
+                )
+            )
+        except Exception:
+            errors += 1
+            if not dry_run:
+                execute(
+                    """
+                    UPDATE t_web_pre_registrations
+                    SET status = 'rejected',
+                        import_error = 'Insert failed',
+                        updated_at = now()
+                    WHERE id = %s
+                    """,
+                    (pre_registration_id,),
+                )
+            results.append(
+                WebPreRegistrationImportResult(
+                    pre_registration_id=pre_registration_id,
+                    name=name,
+                    email=email,
+                    status="error",
+                    detail="Insert failed",
+                )
+            )
+
+    _audit_cud(
+        subject=subject,
+        action="pre_registrations.import",
+        resource_type="student",
+        details={"dry_run": dry_run, "total": len(rows), "imported": imported, "errors": errors},
+    )
+    return WebPreRegistrationImportOut(
+        dry_run=dry_run,
+        total=len(rows),
+        imported=imported,
+        errors=errors,
+        results=results,
+    )
 
 
 @app.get("/news/birthdays", response_model=list[BirthdayNotificationRow])

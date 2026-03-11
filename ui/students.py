@@ -10,6 +10,7 @@ from tkcalendar import DateEntry
 from api_client import (
     active_locations as api_active_locations,
     ApiError,
+    count_pending_pre_registrations as api_count_pending_pre_registrations,
     deactivate_student as api_deactivate_student,
     count_students as api_count_students,
     create_student as api_create_student,
@@ -80,12 +81,19 @@ def build(tab_students):
     # =====================================================
     # Return counts of students grouped by active status.
     def count_students_by_status():
+        active_total = 0
+        inactive_total = 0
+        pre_reg_total = 0
         try:
             active_total = int(api_count_students(status_filter="Active").get("total", 0))
             inactive_total = int(api_count_students(status_filter="Inactive").get("total", 0))
-            return {True: active_total, False: inactive_total}
         except ApiError:
-            return {True: 0, False: 0}
+            pass
+        try:
+            pre_reg_total = int(api_count_pending_pre_registrations().get("total", 0))
+        except ApiError:
+            pass
+        return {True: active_total, False: inactive_total, "pre_registrations": pre_reg_total}
 
     # =====================================================
     # LOADERS
@@ -844,6 +852,7 @@ def build(tab_students):
         stats = count_students_by_status()
         active = stats.get(True, 0)
         inactive = stats.get(False, 0)
+        pre_registrations = stats.get("pre_registrations", 0)
         total = active + inactive
 
         fig = Figure(figsize=(3.2, 3.2), dpi=100)
@@ -858,6 +867,13 @@ def build(tab_students):
             ax.plot(x, [0, total], marker="o", color="blue", label=f"{t('label.total_students')} ({total})")
             ax.plot(x, [0, inactive], marker="o", color="red", label=f"{t('label.inactive')} ({inactive})")
             ax.plot(x, [0, active], marker="o", color="green", label=f"{t('label.active')} ({active})")
+            ax.plot(
+                x,
+                [0, pre_registrations],
+                marker="o",
+                color="purple",
+                label=f"{t('label.pre_registrations')} ({pre_registrations})",
+            )
             ax.set_title(t("label.total_students"))
             ax.set_ylabel(t("label.count"))
             ax.set_xticks([])

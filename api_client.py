@@ -206,6 +206,19 @@ def count_students(status_filter, name_query=""):
     return _with_auth_request("GET", f"/students/count?{params}")
 
 
+def count_pending_pre_registrations():
+    params = urllib.parse.urlencode(
+        {
+            "limit": 1,
+            "offset": 0,
+        }
+    )
+    data = _with_auth_request("GET", f"/pre-registrations/pending?{params}")
+    if not isinstance(data, dict):
+        return {"total": 0}
+    return {"total": int(data.get("total", 0))}
+
+
 def create_student(payload):
     return _with_auth_request("POST", "/students/create", payload=payload)
 

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BJJ Vienna - Registration</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="container">
+    <section class="card">
+      <div class="promo-top">
+        <p id="promoText">Come train with us! Free trial class - no experience needed.</p>
+      </div>
+
+      <div class="lang-row">
+        <label for="languageSwitch" id="languageLabel">Language</label>
+        <select id="languageSwitch" aria-label="Language">
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+        </select>
+      </div>
+
+      <h1 id="titleText">Student Registration</h1>
+      <p id="introText">Please fill in your details. Our team will contact you to complete enrollment.</p>
+
+      <form id="preRegForm" novalidate>
+        <label for="name" id="labelName">Full Name</label>
+        <input id="name" name="name" type="text" required maxlength="120">
+
+        <label for="email" id="labelEmail">Email</label>
+        <input id="email" name="email" type="email" required maxlength="150">
+
+        <label for="phone" id="labelPhone">Phone</label>
+        <input id="phone" name="phone" type="tel" maxlength="50">
+
+        <label for="address" id="labelAddress">Address</label>
+        <input id="address" name="address" type="text" maxlength="250">
+
+        <label for="sex" id="labelSex">Gender</label>
+        <select id="sex" name="sex" required>
+          <option value="M">M</option>
+          <option value="F">F</option>
+        </select>
+
+        <label for="birthday" id="labelBirthday">Date of Birth</label>
+        <input id="birthday" name="birthday" type="date">
+
+        <input id="location_id" name="location_id" type="hidden" value="1">
+
+        <label class="check" id="labelMinorWrap">
+          <input id="is_minor" name="is_minor" type="checkbox">
+          <span id="labelMinor">I am a minor</span>
+        </label>
+
+        <div id="guardianFields" class="guardian hidden">
+          <label for="guardian_name" id="labelGuardianName">Guardian Name</label>
+          <input id="guardian_name" name="guardian_name" type="text" maxlength="120">
+
+          <label for="guardian_email" id="labelGuardianEmail">Guardian Email</label>
+          <input id="guardian_email" name="guardian_email" type="email" maxlength="150">
+
+          <label for="guardian_phone" id="labelGuardianPhone">Guardian Phone</label>
+          <input id="guardian_phone" name="guardian_phone" type="tel" maxlength="50">
+        </div>
+
+        <label for="notes" id="labelNotes">Notes</label>
+        <textarea id="notes" name="notes" rows="4" maxlength="2000"></textarea>
+
+        <label class="check">
+          <input id="newsletter_opt_in" name="newsletter_opt_in" type="checkbox" checked>
+          <span id="labelNewsletter">I agree to receive news and communications</span>
+        </label>
+
+        <label class="check">
+          <input id="consent_privacy" name="consent_privacy" type="checkbox" required>
+          <span id="labelPrivacy">I agree to the processing of my personal data</span>
+        </label>
+
+        <input id="website" name="website" type="text" autocomplete="off" tabindex="-1" class="hidden" aria-hidden="true">
+
+        <button id="submitBtn" type="submit">Submit Registration</button>
+        <p id="formMessage" class="message" role="status"></p>
+      </form>
+
+      <footer class="footer-info">
+        <div class="footer-block">
+          <h3>RENZO GRACIE VIENNA</h3>
+          <p>Blumauergasse 6,<br>1020 Wien, Austria</p>
+          <p>(+43) 676-3321744</p>
+        </div>
+
+        <div class="footer-block footer-center">
+          <h3 id="contactTitle">Contact Us</h3>
+          <p id="contactLead">Ready to try Jiu-Jitsu? Sign up now for a free trial class - no experience needed!</p>
+          <p><a href="mailto:renzogracievienna@gmail.com">renzogracievienna@gmail.com</a></p>
+          <p>(+43) 676-3321744</p>
+          <p>Blumauergasse 6,<br>1020 Wien, Austria</p>
+        </div>
+
+        <div class="footer-block footer-right">
+          <h3 id="followTitle">Follow Us</h3>
+          <div class="social-links">
+            <a href="https://www.instagram.com/renzogracievienna" target="_blank" rel="noopener noreferrer" aria-label="Instagram" title="Instagram">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="5"></rect>
+                <circle cx="12" cy="12" r="4.2"></circle>
+                <circle cx="17.3" cy="6.7" r="1.2"></circle>
+              </svg>
+              <span>Instagram</span>
+            </a>
+            <a href="https://x.com/renzograciewien" target="_blank" rel="noopener noreferrer" aria-label="X" title="X">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <line x1="5" y1="4" x2="19" y2="20"></line>
+                <line x1="19" y1="4" x2="5" y2="20"></line>
+              </svg>
+              <span>X</span>
+            </a>
+            <a href="https://www.youtube.com/@renzogracievienna" target="_blank" rel="noopener noreferrer" aria-label="YouTube" title="YouTube">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="6" width="18" height="12" rx="4"></rect>
+                <polygon points="10,9 16,12 10,15"></polygon>
+              </svg>
+              <span>YouTube</span>
+            </a>
+            <a href="https://www.facebook.com/profile.php?id=61571388530589" target="_blank" rel="noopener noreferrer" aria-label="Facebook" title="Facebook">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M14 8h3V4h-3c-3.2 0-5 1.8-5 5v3H6v4h3v4h4v-4h3l1-4h-4V9c0-.7.3-1 1-1z"></path>
+              </svg>
+              <span>Facebook</span>
+            </a>
+          </div>
+          <p class="site-link">
+            <a href="https://www.renzogracievienna.com/" target="_blank" rel="noopener noreferrer">
+              https://www.renzogracievienna.com/
+            </a>
+          </p>
+        </div>
+      </footer>
+    </section>
+  </main>
+
+  <script>
+    window.__API_BASE_URL__ = "https://backend-unique-tenderness-stage.up.railway.app";
+  </script>
+  <script src="./app.js"></script>
+</body>
+</html>

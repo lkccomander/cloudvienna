@@ -142,6 +142,75 @@ class StudentBatchCreateOut(BaseModel):
     results: list[StudentBatchCreateResult]
 
 
+class WebPreRegistrationIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    email: str = Field(min_length=1, max_length=150)
+    sex: str = Field(description="M, F, or NA")
+    phone: Optional[str] = Field(default=None, max_length=50)
+    address: Optional[str] = Field(default=None, max_length=250)
+    birthday: Optional[date] = None
+    is_minor: bool = False
+    guardian_name: Optional[str] = Field(default=None, max_length=120)
+    guardian_email: Optional[str] = Field(default=None, max_length=150)
+    guardian_phone: Optional[str] = Field(default=None, max_length=50)
+    newsletter_opt_in: bool = True
+    location_id: Optional[int] = None
+    notes: Optional[str] = Field(default=None, max_length=2000)
+    consent_privacy: bool = True
+    website: str = Field(default="", max_length=200)
+
+
+class WebPreRegistrationCreateOut(BaseModel):
+    id: int
+    status: Literal["pending"] = "pending"
+
+
+class WebPreRegistrationRow(BaseModel):
+    id: int
+    name: str
+    email: str
+    sex: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    birthday: Optional[date] = None
+    is_minor: bool = False
+    guardian_name: Optional[str] = None
+    guardian_email: Optional[str] = None
+    guardian_phone: Optional[str] = None
+    newsletter_opt_in: bool = True
+    location_id: Optional[int] = None
+    notes: Optional[str] = None
+    status: Literal["pending", "imported", "rejected"] = "pending"
+    imported_student_id: Optional[int] = None
+    import_error: Optional[str] = None
+    consent_at: datetime
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WebPreRegistrationListOut(BaseModel):
+    total: int
+    rows: list[WebPreRegistrationRow]
+
+
+class WebPreRegistrationImportResult(BaseModel):
+    pre_registration_id: int
+    name: str
+    email: str
+    status: Literal["imported", "error", "would_import"]
+    student_id: Optional[int] = None
+    detail: Optional[str] = None
+
+
+class WebPreRegistrationImportOut(BaseModel):
+    dry_run: bool = False
+    total: int
+    imported: int
+    errors: int
+    results: list[WebPreRegistrationImportResult]
+
+
 class StudentCreateResponse(BaseModel):
     id: int
     created_at: datetime
