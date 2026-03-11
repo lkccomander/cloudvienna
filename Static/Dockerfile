@@ -1,3 +1,4 @@
 FROM nginx:alpine
 COPY . /usr/share/nginx/html
-EXPOSE 80
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+EXPOSE 8080
