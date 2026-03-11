@@ -112,7 +112,26 @@
   const guardianEmail = document.getElementById("guardian_email");
   let currentLang = "en";
 
-  const apiBase = (window.__API_BASE_URL__ || "").replace(/\/+$/, "");
+  function inferApiBaseFromHostname() {
+    const hostname = window.location.hostname || "";
+    if (!hostname) return "";
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.endsWith(".local")
+    ) {
+      return "https://backend-unique-tenderness-stage.up.railway.app";
+    }
+    if (hostname.includes("production")) {
+      return "https://backend-unique-tenderness-production.up.railway.app";
+    }
+    if (hostname.includes("stage") || hostname.includes("staging")) {
+      return "https://backend-unique-tenderness-stage.up.railway.app";
+    }
+    return "";
+  }
+
+  const apiBase = (window.__API_BASE_URL__ || inferApiBaseFromHostname()).replace(/\/+$/, "");
   const endpoint = apiBase ? `${apiBase}/public/pre-registrations` : "/public/pre-registrations";
 
   function setMessage(text, type) {
@@ -263,7 +282,10 @@
         return {};
       });
       if (!response.ok) {
-        const detail = body && body.detail ? String(body.detail) : t("errSave");
+        const detail =
+          body && body.detail
+            ? String(body.detail)
+            : `Request failed (${response.status})`;
         throw new Error(detail);
       }
       form.reset();
