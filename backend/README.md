@@ -51,6 +51,11 @@ This is the first backend scaffold to remove direct DB access from the GUI clien
 - `POST /reports/students/search`
 - `POST /reports/students/export`
 
+Pre-registration flow:
+- `POST /public/pre-registrations` (public intake)
+- `GET /pre-registrations/pending` (staff review)
+- `POST /pre-registrations/import?dry_run=true|false` (staff import to students)
+
 Batch endpoints support dry run:
 - `POST /users/batch-create?dry_run=true`
 - `POST /students/batch-create?dry_run=true`
@@ -179,3 +184,11 @@ Notes:
 - Backward-compatible aliases are still accepted: `APP_ENV=prod|cloud`.
 - On first startup, the API bootstraps an admin user into `t_api_users` from
   `API_ADMIN_USER` and `API_ADMIN_PASSWORD` if that username does not exist yet.
+
+## Lessons Learned (2026-03-11)
+
+- For local DB on `localhost`, `DB_SSLMODE=require` can fail with:
+  - `server does not support SSL, but SSL was required`
+  - Use `DB_SSLMODE=prefer` (or `disable`) for local non-SSL Postgres.
+- Serializing request payload snapshots with `date` fields requires JSON mode:
+  - Use `payload.model_dump(mode="json")` before `json.dumps(...)`.

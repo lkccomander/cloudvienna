@@ -20,10 +20,11 @@ body {
   background-color: var(--bg);
   background-image:
     linear-gradient(rgba(9, 14, 20, 0.86), rgba(9, 14, 20, 0.86)),
+    url("./wall2.png"),
     url("./wall2.png");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  background-size: 100% 100%, 680px auto, 680px auto;
+  background-position: center, 0 0, 340px 340px;
+  background-repeat: no-repeat, repeat, repeat;
 }
 
 .container {
@@ -54,6 +55,17 @@ body {
   border-radius: 10px;
   padding: 0.75rem 0.9rem;
   margin-bottom: 1rem;
+}
+
+.brand-logo {
+  width: 132px;
+  height: 132px;
+  object-fit: cover;
+  border-radius: 999px;
+  border: 3px solid #0b1520;
+  background: #ffffff;
+  display: block;
+  margin: 0 auto 0.6rem auto;
 }
 
 .promo-top p {
@@ -201,6 +213,15 @@ button:disabled {
 
 .footer-center {
   text-align: center;
+}
+
+.watermark {
+  margin: 1rem 0 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 0.8rem;
+  color: #9cb0c5;
 }
 
 .social-links {

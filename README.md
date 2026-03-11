@@ -83,6 +83,18 @@ pytest -q
 - Session scheduling uniqueness is location-aware:
   - same class/date/start time is allowed across different locations.
   - same class/date/start time in the same location returns `409 Conflict`.
+- Added public web pre-registration flow:
+  - Static registration site under `Static/` (EN/DE switch, mobile-first improvements, dark theme, social/footer blocks).
+  - Backend intake endpoint `POST /public/pre-registrations`.
+  - Staff review/import endpoints `GET /pre-registrations/pending` and `POST /pre-registrations/import`.
+  - Students tab statistics now includes a pre-registrations category.
+
+## Lessons Learned (2026-03-11)
+- Railway static services with Nginx must listen on `${PORT}` (otherwise `502`).
+- With Docker build context at repo root, copy paths in `Static/Dockerfile` must use `Static/...`.
+- Local Postgres commonly needs `DB_SSLMODE=prefer` (or `disable`) when server does not support SSL.
+- `date` values in Pydantic payloads must be JSON-serialized using `model_dump(mode=\"json\")`.
+- `API_CORS_ALLOW_ORIGINS` must include the deployed static domain for browser form submissions.
 
 ## Star History
 <a href="https://www.star-history.com/#lkccomander/bjjvienna.git&type=date&legend=top-left">
