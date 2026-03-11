@@ -1,0 +1,30 @@
+{
+  "name": "Renzo Gracie Vienna Registration",
+  "short_name": "RG Vienna",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f1720",
+  "theme_color": "#67a2cc",
+  "description": "Student pre-registration form for Renzo Gracie Vienna.",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo1.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo1.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}
