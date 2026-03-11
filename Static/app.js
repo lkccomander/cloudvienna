@@ -293,6 +293,6 @@
   });
   isMinor.addEventListener("change", onMinorToggle);
   form.addEventListener("submit", submitForm);
-  applyLanguage((navigator.language || "").toLowerCase().startsWith("de") ? "de" : "en");
+  applyLanguage("de");
   onMinorToggle();
 })();
