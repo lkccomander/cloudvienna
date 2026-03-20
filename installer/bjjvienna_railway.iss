@@ -41,7 +41,6 @@ var
   DbNameEdit: TNewEdit;
   ApiBaseUrlEdit: TNewEdit;
   ApiUserEdit: TNewEdit;
-  ApiPasswordEdit: TNewEdit;
   ApiVerifyTlsCheck: TNewCheckBox;
 
 function JsonEscape(const S: string): string;
@@ -96,9 +95,6 @@ begin
   AddField(ConfigPage, 'Database name', DbNameEdit, TopPos, 'cloudvienna');
   AddField(ConfigPage, 'API base URL', ApiBaseUrlEdit, TopPos, 'https://backend-unique-tenderness-stage.up.railway.app');
   AddField(ConfigPage, 'API username', ApiUserEdit, TopPos, 'admin');
-  AddField(ConfigPage, 'API password', ApiPasswordEdit, TopPos, '');
-  ApiPasswordEdit.PasswordChar := '*';
-
   ApiVerifyTlsCheck := TNewCheckBox.Create(ConfigPage);
   ApiVerifyTlsCheck.Parent := ConfigPage.Surface;
   ApiVerifyTlsCheck.Left := ScaleX(0);
@@ -151,12 +147,6 @@ begin
       Result := False;
       exit;
     end;
-    if Trim(ApiPasswordEdit.Text) = '' then
-    begin
-      MsgBox('API password is required.', mbError, MB_OK);
-      Result := False;
-      exit;
-    end;
   end;
 end;
 
@@ -193,7 +183,6 @@ begin
     '  "api": {' + #13#10 +
     '    "base_url": "' + JsonEscape(Trim(ApiBaseUrlEdit.Text)) + '",' + #13#10 +
     '    "username": "' + JsonEscape(Trim(ApiUserEdit.Text)) + '",' + #13#10 +
-    '    "password": "' + JsonEscape(ApiPasswordEdit.Text) + '",' + #13#10 +
     '    "verify_tls": ' + VerifyTlsText + #13#10 +
     '  },' + #13#10 +
     '  "db": {' + #13#10 +
