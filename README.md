@@ -79,6 +79,12 @@ pytest -q
   - `docs/PROD_SECURITY_CHECKLIST.md`
 
 ## Recent Updates
+- 2026-03-20:
+  - Windows installers no longer ask for the API password during setup.
+  - Installer-generated `app_settings.json` now stores `api.base_url`, `api.username`, and `api.verify_tls`, but not `api.password`.
+  - Default API base URL is defined in the Inno Setup scripts:
+    - `installer/bjjvienna.iss` for the standard installer (`http://127.0.0.1:8000`).
+    - `installer/bjjvienna_railway.iss` for the Railway installer.
 - Attendance Week now supports filtering by active location and shows selected location in the calendar header.
 - Session scheduling uniqueness is location-aware:
   - same class/date/start time is allowed across different locations.

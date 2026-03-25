@@ -68,6 +68,7 @@
 ## Configuration
 - Backend: `backend/.env*` controls DB/API runtime values (`APP_ENV` selects variant).
 - Desktop: `app_settings.json` stores API endpoint/credentials and user preferences.
+- Installer-generated desktop config no longer stores `api.password`; users authenticate at runtime when needed.
 - `scripts/bootstrap_instance.py` writes both backend env and client settings for first-time setup.
 - In `stage/demo/production`, backend startup fails fast when critical secrets are weak/default.
 
@@ -78,7 +79,9 @@
 ## Build and distribution
 - `requirements.txt` lists runtime and tooling dependencies.
 - `pyinstaller` is used for packaging (see `gui.spec`).
-- Installer is defined in `installer/bjjvienna.iss` (first-run settings page support).
+- Installers are defined in `installer/bjjvienna.iss` and `installer/bjjvienna_railway.iss`.
+- The installer first-run settings page captures DB host/port/name plus API base URL, username, and TLS verification.
+- The default API base URL is hardcoded in the corresponding `.iss` file and is written only when `app_settings.json` does not already exist.
 - CI: `.github/workflows/ci.yml` (Python 3.11 stable + 3.14 experimental).
 - Release: `.github/workflows/release.yml` includes quality gate (`ruff` + `pytest`) before publishing.
 
