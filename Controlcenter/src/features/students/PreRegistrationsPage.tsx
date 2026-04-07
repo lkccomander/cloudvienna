@@ -21,10 +21,10 @@ export function PreRegistrationsPage() {
   const errorRows = (lastRun?.results || []).filter((row) => row.status === "error");
 
   function tr(key: string, vars: Record<string, string | number> = {}) {
-    return Object.entries(vars).reduce(
-      (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
-      t(key),
-    );
+    return Object.entries(vars).reduce((text, [name, value]) => {
+      const token = `{${name}}`;
+      return text.split(token).join(String(value));
+    }, t(key));
   }
 
   async function copyError(row: { pre_registration_id: number; email: string; detail: string | null }) {
