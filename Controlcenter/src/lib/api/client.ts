@@ -18,6 +18,7 @@ import type {
   StudentFollowupRoadmap,
   Teacher,
   TokenResponse,
+  PreRegistrationImportOut,
   UserPreferences,
 } from "./types";
 
@@ -167,4 +168,13 @@ export const api = {
     apiDownload(`/audit/logs/export?${params.toString()}`, token, "audit-export.csv"),
   pendingPreRegistrations: (token: string, params = new URLSearchParams({ limit: "50", offset: "0" })) =>
     apiRequest<PreRegistrationListOut>(`/pre-registrations/pending?${params.toString()}`, {}, token),
+  importPreRegistrations: (
+    token: string,
+    { dryRun = true, limit = 200 }: { dryRun?: boolean; limit?: number } = {},
+  ) =>
+    apiRequest<PreRegistrationImportOut>(
+      `/pre-registrations/import?dry_run=${dryRun ? "true" : "false"}&limit=${limit}`,
+      { method: "POST" },
+      token,
+    ),
 };

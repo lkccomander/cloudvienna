@@ -213,6 +213,17 @@ def _validate_pre_registration_payload(payload: WebPreRegistrationIn) -> tuple[s
     return name, email
 
 
+def _validate_pre_registration_location(location_id: int | None) -> None:
+    if location_id is None:
+        return
+    row = fetch_one("SELECT id FROM t_locations WHERE id=%s", (location_id,))
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid location_id: selected location was not found. / Ungueltige location_id: ausgewaehlter Standort wurde nicht gefunden.",
+        )
+
+
 def _run_startup_migrations():
     # Keep API resilient with legacy databases used by the current desktop app.
     """executes the run startup migrations operation.
@@ -1007,6 +1018,7 @@ def create_web_pre_registration(payload: WebPreRegistrationIn, request: Request)
         )
     _record_public_pre_reg_attempt(identity)
     name, email = _validate_pre_registration_payload(payload)
+    _validate_pre_registration_location(payload.location_id)
     sex = _normalize_sex(payload.sex)
     row = execute_returning_one(
         """

@@ -187,16 +187,48 @@ export interface AuditLogSearchOut {
   rows: AuditLogRow[];
 }
 
+export interface PreRegistrationRow {
+  id: number;
+  name: string;
+  email: string;
+  sex: string;
+  phone: string | null;
+  address: string | null;
+  birthday: string | null;
+  is_minor: boolean;
+  guardian_name: string | null;
+  guardian_email: string | null;
+  guardian_phone: string | null;
+  newsletter_opt_in: boolean;
+  location_id: number | null;
+  notes: string | null;
+  status: "pending" | "imported" | "rejected";
+  imported_student_id: number | null;
+  import_error: string | null;
+  consent_at: string;
+  created_at: string;
+}
+
 export interface PreRegistrationListOut {
   total: number;
-  rows: Array<{
-    id: number;
-    name: string;
-    email: string;
-    status: "pending" | "imported" | "rejected";
-    location_id: number | null;
-    created_at: string;
-  }>;
+  rows: PreRegistrationRow[];
+}
+
+export interface PreRegistrationImportResult {
+  pre_registration_id: number;
+  name: string;
+  email: string;
+  status: "imported" | "error" | "would_import";
+  student_id: number | null;
+  detail: string | null;
+}
+
+export interface PreRegistrationImportOut {
+  dry_run: boolean;
+  total: number;
+  imported: number;
+  errors: number;
+  results: PreRegistrationImportResult[];
 }
 
 export interface IdCreatedResponse {

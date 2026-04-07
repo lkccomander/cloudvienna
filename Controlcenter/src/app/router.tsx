@@ -7,6 +7,7 @@ import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { BirthdaysPage } from "../features/news/BirthdaysPage";
 import { UsersPage } from "../features/users/UsersPage";
 import { StudentsPage } from "../features/students/StudentsPage";
+import { PreRegistrationsPage } from "../features/students/PreRegistrationsPage";
 import { StudentDetailPage } from "../features/students/StudentDetailPage";
 import { TeachersPage } from "../features/training/TeachersPage";
 import { ClassesPage } from "../features/training/ClassesPage";
@@ -43,6 +44,7 @@ export const router = createBrowserRouter([
           { path: "/dashboard", element: <DashboardPage /> },
           { path: "/news/birthdays", element: <BirthdaysPage /> },
           { path: "/students", element: <StudentsPage /> },
+          { path: "/students/pre-registrations", element: <PreRegistrationsPage /> },
           { path: "/students/:studentId", element: <StudentDetailPage /> },
           { path: "/training/teachers", element: <TeachersPage /> },
           { path: "/training/classes", element: <ClassesPage /> },

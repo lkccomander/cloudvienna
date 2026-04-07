@@ -9,6 +9,7 @@ interface NavItem {
   to: string;
   labelKey: string;
   roles?: UserRole[];
+  isSubItem?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -16,6 +17,7 @@ const navItems: NavItem[] = [
   { to: "/news/birthdays", labelKey: "nav.news" },
   { to: "/users", labelKey: "nav.users", roles: ["admin"] },
   { to: "/students", labelKey: "nav.students" },
+  { to: "/students/pre-registrations", labelKey: "nav.students_pre_registrations", isSubItem: true },
   { to: "/training/teachers", labelKey: "nav.training" },
   { to: "/reports/students", labelKey: "nav.reports", roles: ["admin", "receptionist"] },
   { to: "/audit", labelKey: "nav.audit", roles: ["admin"] },
@@ -66,6 +68,7 @@ export function AppShell() {
                   className={({ isActive }) =>
                     cn(
                       "nav-link rounded-2xl px-4 py-3 text-sm transition",
+                      item.isSubItem ? "pl-9 text-[13px]" : "",
                       isActive || location.pathname.startsWith(item.to + "/")
                         ? "nav-link-active"
                         : "",
