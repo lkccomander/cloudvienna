@@ -31,7 +31,16 @@ export class ApiError extends Error {
   }
 }
 
+function requireApiBaseUrl(): string {
+  if (API_BASE_URL) return API_BASE_URL;
+  throw new ApiError(
+    0,
+    "API base URL is not configured. Set VITE_API_BASE_URL in Controlcenter deployment settings and allow this origin in backend API_CORS_ALLOW_ORIGINS.",
+  );
+}
+
 async function apiRequest<T>(path: string, options: RequestInit = {}, token?: string | null): Promise<T> {
+  const apiBaseUrl = requireApiBaseUrl();
   const headers = new Headers(options.headers || {});
   if (!headers.has("Content-Type") && options.body) {
     headers.set("Content-Type", "application/json");
@@ -41,7 +50,7 @@ async function apiRequest<T>(path: string, options: RequestInit = {}, token?: st
   }
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+    response = await fetch(`${apiBaseUrl}${path}`, { ...options, headers });
   } catch (error) {
     const reason =
       error instanceof Error && error.message
@@ -49,7 +58,7 @@ async function apiRequest<T>(path: string, options: RequestInit = {}, token?: st
         : "Network request failed";
     throw new ApiError(
       0,
-      `Could not reach API at ${API_BASE_URL}. Check backend status and CORS origin settings. ${reason}`,
+      `Could not reach API at ${apiBaseUrl}. Check backend status and CORS origin settings. ${reason}`,
     );
   }
   if (!response.ok) {
@@ -72,7 +81,8 @@ async function apiRequest<T>(path: string, options: RequestInit = {}, token?: st
 }
 
 async function apiDownload(path: string, token: string, filenameFallback: string) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const apiBaseUrl = requireApiBaseUrl();
+  const response = await fetch(`${apiBaseUrl}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new ApiError(response.status, "Download failed");

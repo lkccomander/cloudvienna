@@ -6,7 +6,6 @@ import { LoginPage } from "../features/auth/LoginPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { BirthdaysPage } from "../features/news/BirthdaysPage";
 import { UsersPage } from "../features/users/UsersPage";
-import { PreferencesPage } from "../features/profile/PreferencesPage";
 import { StudentsPage } from "../features/students/StudentsPage";
 import { StudentDetailPage } from "../features/students/StudentDetailPage";
 import { TeachersPage } from "../features/training/TeachersPage";
@@ -49,7 +48,7 @@ export const router = createBrowserRouter([
           { path: "/training/classes", element: <ClassesPage /> },
           { path: "/training/sessions", element: <SessionsPage /> },
           { path: "/training/attendance", element: <AttendancePage /> },
-          { path: "/profile/preferences", element: <PreferencesPage /> },
+          { path: "/profile/preferences", element: <Navigate to="/dashboard" replace /> },
           {
             element: <RequireRoles roles={["admin"]} />,
             children: [

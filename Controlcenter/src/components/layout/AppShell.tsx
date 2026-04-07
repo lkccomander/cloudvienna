@@ -19,7 +19,6 @@ const navItems: NavItem[] = [
   { to: "/training/teachers", labelKey: "nav.training" },
   { to: "/reports/students", labelKey: "nav.reports", roles: ["admin", "receptionist"] },
   { to: "/audit", labelKey: "nav.audit", roles: ["admin"] },
-  { to: "/profile/preferences", labelKey: "nav.profile" },
 ];
 
 function roleAllows(role: UserRole | undefined, item: NavItem) {
