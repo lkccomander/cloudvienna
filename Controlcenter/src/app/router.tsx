@@ -6,6 +6,7 @@ import { LoginPage } from "../features/auth/LoginPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { BirthdaysPage } from "../features/news/BirthdaysPage";
 import { UsersPage } from "../features/users/UsersPage";
+import { LocationsPage } from "../features/locations/LocationsPage";
 import { StudentsPage } from "../features/students/StudentsPage";
 import { PreRegistrationsPage } from "../features/students/PreRegistrationsPage";
 import { StudentDetailPage } from "../features/students/StudentDetailPage";
@@ -55,6 +56,7 @@ export const router = createBrowserRouter([
             element: <RequireRoles roles={["admin"]} />,
             children: [
               { path: "/users", element: <UsersPage /> },
+              { path: "/locations", element: <LocationsPage /> },
               { path: "/audit", element: <AuditPage /> },
             ],
           },

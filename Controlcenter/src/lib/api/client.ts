@@ -132,6 +132,12 @@ export const api = {
   upsertStudentFollowup: (token: string, studentId: number, payload: Record<string, unknown>) =>
     apiRequest<StudentFollowup>(`/students/${studentId}/followups/upsert`, { method: "POST", body: JSON.stringify(payload) }, token),
   listLocations: (token: string) => apiRequest<Location[]>("/locations/list", {}, token),
+  createLocation: (token: string, payload: Record<string, unknown>) =>
+    apiRequest<IdCreatedResponse>("/locations/create", { method: "POST", body: JSON.stringify(payload) }, token),
+  updateLocation: (token: string, locationId: number, payload: Record<string, unknown>) =>
+    apiRequest<IdCreatedResponse>(`/locations/${locationId}`, { method: "PUT", body: JSON.stringify(payload) }, token),
+  setLocationActive: (token: string, locationId: number, active: boolean) =>
+    apiRequest<{ status: string }>(`/locations/${locationId}/${active ? "reactivate" : "deactivate"}`, { method: "POST" }, token),
   listTeachers: (token: string) => apiRequest<Teacher[]>("/teachers/list", {}, token),
   createTeacher: (token: string, payload: Record<string, unknown>) =>
     apiRequest<IdCreatedResponse>("/teachers/create", { method: "POST", body: JSON.stringify(payload) }, token),

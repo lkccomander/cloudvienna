@@ -2,25 +2,28 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../app/providers/AuthProvider";
 import { useI18n } from "../../app/providers/I18nProvider";
 import { useTheme } from "../../app/providers/ThemeProvider";
+import { Icon, type IconName } from "../Icon";
 import type { UserRole } from "../../lib/api/types";
 import { cn } from "../../lib/utils";
 
 interface NavItem {
   to: string;
   labelKey: string;
+  icon: IconName;
   roles?: UserRole[];
   isSubItem?: boolean;
 }
 
 const navItems: NavItem[] = [
-  { to: "/dashboard", labelKey: "nav.dashboard" },
-  { to: "/news/birthdays", labelKey: "nav.news" },
-  { to: "/users", labelKey: "nav.users", roles: ["admin"] },
-  { to: "/students", labelKey: "nav.students" },
-  { to: "/students/pre-registrations", labelKey: "nav.students_pre_registrations", isSubItem: true },
-  { to: "/training/teachers", labelKey: "nav.training" },
-  { to: "/reports/students", labelKey: "nav.reports", roles: ["admin", "receptionist"] },
-  { to: "/audit", labelKey: "nav.audit", roles: ["admin"] },
+  { to: "/dashboard", labelKey: "nav.dashboard", icon: "home" },
+  { to: "/news/birthdays", labelKey: "nav.news", icon: "newspaper" },
+  { to: "/users", labelKey: "nav.users", icon: "users", roles: ["admin"] },
+  { to: "/locations", labelKey: "nav.locations", icon: "mapPin", roles: ["admin"] },
+  { to: "/students", labelKey: "nav.students", icon: "users" },
+  { to: "/students/pre-registrations", labelKey: "nav.students_pre_registrations", icon: "fileText", isSubItem: true },
+  { to: "/training/teachers", labelKey: "nav.training", icon: "calendar" },
+  { to: "/reports/students", labelKey: "nav.reports", icon: "fileText", roles: ["admin", "receptionist"] },
+  { to: "/audit", labelKey: "nav.audit", icon: "activity", roles: ["admin"] },
 ];
 
 function roleAllows(role: UserRole | undefined, item: NavItem) {
@@ -67,7 +70,7 @@ export function AppShell() {
                   to={item.to}
                   className={({ isActive }) =>
                     cn(
-                      "nav-link rounded-2xl px-4 py-3 text-sm transition",
+                      "nav-link flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition",
                       item.isSubItem ? "pl-9 text-[13px]" : "",
                       isActive || location.pathname.startsWith(item.to + "/")
                         ? "nav-link-active"
@@ -75,7 +78,11 @@ export function AppShell() {
                     )
                   }
                 >
-                  {t(item.labelKey)}
+                  <span className="nav-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
+                    <Icon name={item.icon} className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{t(item.labelKey)}</span>
+                  <Icon name="chevronRight" className="h-4 w-4 shrink-0 opacity-50" />
                 </NavLink>
               ))}
             </nav>
@@ -90,8 +97,9 @@ export function AppShell() {
                 logout();
                 navigate("/login");
               }}
-              className="theme-ghost-button mt-4 w-full rounded-2xl px-4 py-3 text-sm font-medium"
+              className="theme-ghost-button mt-4 flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium"
             >
+              <Icon name="logOut" className="h-4 w-4" />
               {t("app.sign_out")}
             </button>
           </div>
@@ -127,14 +135,9 @@ export function AppShell() {
                   className="theme-icon-button flex h-12 w-12 items-center justify-center rounded-[1rem]"
                 >
                   {theme === "dark" ? (
-                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-                      <circle cx="12" cy="12" r="4.5" />
-                      <path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3" />
-                    </svg>
+                    <Icon name="sun" className="h-5 w-5" />
                   ) : (
-                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-                      <path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 9 9 0 1 0 20 15.5Z" />
-                    </svg>
+                    <Icon name="moon" className="h-5 w-5" />
                   )}
                 </button>
               </div>
