@@ -349,7 +349,7 @@ class AttendanceRegisterIn(BaseModel):
     session_id: int
     student_id: int
     status: str = Field(min_length=1, max_length=30)
-    source: str = Field(min_length=1, max_length=30)
+    source: Literal["coach", "qr", "kiosk", "admin", "web"] = "web"
 
 
 class AttendanceRow(BaseModel):

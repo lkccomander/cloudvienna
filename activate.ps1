@@ -27,6 +27,8 @@ Write-Host "Using APP_ENV=$env:APP_ENV" -ForegroundColor DarkYellow
 Write-Host "========================================" -ForegroundColor DarkGray
 
 $venvDir = Join-Path $ProjectRoot ".venv"
+$startCC = Join-Path $ProjectRoot "project_brain\build_classes_sessions_gui.py"
+$iniBat = Join-Path $ProjectRoot "ini.bat"
 $pyvenvCfg = Join-Path $venvDir "pyvenv.cfg"
 $activateScript = Join-Path $venvDir "Scripts\Activate.ps1"
 
@@ -51,3 +53,9 @@ if (-not (Test-Path $activateScript)) {
 }
 
 . $activateScript
+
+Write-Host "[INFO] Starting Classes/Sessions builder..." -ForegroundColor Cyan
+Start-Process -FilePath "python" -ArgumentList "`"$startCC`"" -WorkingDirectory $ProjectRoot
+
+Write-Host "[INFO] Starting desktop app..." -ForegroundColor Cyan
+Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "`"$iniBat`"" -WorkingDirectory $ProjectRoot

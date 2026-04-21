@@ -60,6 +60,7 @@ export function TeachersPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3">
+        <Link to="/training/schedule" className="theme-secondary-button px-4 py-3 text-sm hover:bg-[var(--hover)]">Go to schedule</Link>
         <Link to="/training/classes" className="theme-secondary-button px-4 py-3 text-sm hover:bg-[var(--hover)]">Go to classes</Link>
         <Link to="/training/sessions" className="theme-secondary-button px-4 py-3 text-sm hover:bg-[var(--hover)]">Go to sessions</Link>
         <Link to="/training/attendance" className="theme-secondary-button px-4 py-3 text-sm hover:bg-[var(--hover)]">Go to attendance</Link>

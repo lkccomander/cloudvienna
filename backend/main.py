@@ -537,6 +537,20 @@ def _run_startup_migrations():
     )
     execute(
         """
+        DO $$
+        BEGIN
+            ALTER TABLE t_attendance DROP CONSTRAINT IF EXISTS t_attendance_checkin_source_check;
+            ALTER TABLE t_attendance
+                ADD CONSTRAINT t_attendance_checkin_source_check
+                CHECK (checkin_source IN ('coach', 'qr', 'kiosk', 'admin', 'web'));
+        EXCEPTION
+            WHEN undefined_table THEN NULL;
+            WHEN duplicate_object THEN NULL;
+        END $$;
+        """
+    )
+    execute(
+        """
         CREATE TABLE IF NOT EXISTS t_web_pre_registrations (
             id bigserial PRIMARY KEY,
             name varchar(120) NOT NULL,

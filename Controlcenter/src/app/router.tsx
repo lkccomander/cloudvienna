@@ -13,6 +13,7 @@ import { StudentDetailPage } from "../features/students/StudentDetailPage";
 import { TeachersPage } from "../features/training/TeachersPage";
 import { ClassesPage } from "../features/training/ClassesPage";
 import { SessionsPage } from "../features/training/SessionsPage";
+import { SchedulePage } from "../features/training/SchedulePage";
 import { AttendancePage } from "../features/training/AttendancePage";
 import { ReportsPage } from "../features/reports/ReportsPage";
 import { AuditPage } from "../features/audit/AuditPage";
@@ -50,6 +51,7 @@ export const router = createBrowserRouter([
           { path: "/training/teachers", element: <TeachersPage /> },
           { path: "/training/classes", element: <ClassesPage /> },
           { path: "/training/sessions", element: <SessionsPage /> },
+          { path: "/training/schedule", element: <SchedulePage /> },
           { path: "/training/attendance", element: <AttendancePage /> },
           { path: "/profile/preferences", element: <Navigate to="/dashboard" replace /> },
           {

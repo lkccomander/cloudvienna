@@ -31,8 +31,8 @@ if not exist "node_modules" (
     )
 )
 
-echo [INFO] Controlcenter will be available at:
-echo        http://127.0.0.1:4173/
+echo [INFO] Controlcenter is starting. Vite will print the actual local URL below.
+echo        Preferred URL: http://127.0.0.1:4173/
 echo.
 
 call npm run dev -- --host 127.0.0.1 --port 4173

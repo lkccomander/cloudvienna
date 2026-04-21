@@ -67,6 +67,7 @@ export function SessionsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3">
+        <Link to="/training/schedule" className="theme-secondary-button px-4 py-3 text-sm hover:bg-[var(--hover)]">Schedule</Link>
         <Link to="/training/classes" className="theme-secondary-button px-4 py-3 text-sm hover:bg-[var(--hover)]">Classes</Link>
         <Link to="/training/attendance" className="theme-secondary-button px-4 py-3 text-sm hover:bg-[var(--hover)]">Attendance</Link>
       </div>

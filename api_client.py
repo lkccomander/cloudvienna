@@ -42,13 +42,19 @@ def _api_config():
     else:
         verify_tls = bool(verify_tls)
     ca_file = os.getenv("API_CA_FILE") or cfg.get("ca_file") or ""
-    return {
+    resolved = {
         "base_url": (base_url or "").rstrip("/"),
         "username": username or "",
         "password": password or "",
         "verify_tls": verify_tls,
         "ca_file": str(ca_file).strip(),
     }
+    if _SESSION_API_CONFIG is not None:
+        for key in ("base_url", "username", "password"):
+            value = _SESSION_API_CONFIG.get(key)
+            if value is not None:
+                resolved[key] = str(value).strip().rstrip("/") if key == "base_url" else str(value)
+    return resolved
 
 
 def is_api_configured():
@@ -61,6 +67,31 @@ _TOKEN_EXP = 0
 _SESSION_USERNAME = ""
 _SESSION_PASSWORD = ""
 _SESSION_USER = None
+_SESSION_API_CONFIG = None
+
+
+def get_api_config():
+    return dict(_api_config())
+
+
+def set_session_api_config(base_url=None, username=None, password=None):
+    global _SESSION_API_CONFIG, _TOKEN, _TOKEN_EXP, _SESSION_USER
+    _SESSION_API_CONFIG = {
+        "base_url": (base_url or "").strip().rstrip("/"),
+        "username": (username or "").strip(),
+        "password": password or "",
+    }
+    _TOKEN = None
+    _TOKEN_EXP = 0
+    _SESSION_USER = None
+
+
+def clear_session_api_config():
+    global _SESSION_API_CONFIG, _TOKEN, _TOKEN_EXP, _SESSION_USER
+    _SESSION_API_CONFIG = None
+    _TOKEN = None
+    _TOKEN_EXP = 0
+    _SESSION_USER = None
 
 
 def set_session_credentials(username, password):

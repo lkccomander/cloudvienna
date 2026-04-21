@@ -22,6 +22,7 @@ const navItems: NavItem[] = [
   { to: "/students", labelKey: "nav.students", icon: "users" },
   { to: "/students/pre-registrations", labelKey: "nav.students_pre_registrations", icon: "fileText", isSubItem: true },
   { to: "/training/teachers", labelKey: "nav.training", icon: "calendar" },
+  { to: "/training/schedule", labelKey: "nav.schedule", icon: "calendar", isSubItem: true },
   { to: "/reports/students", labelKey: "nav.reports", icon: "fileText", roles: ["admin", "receptionist"] },
   { to: "/audit", labelKey: "nav.audit", icon: "activity", roles: ["admin"] },
 ];

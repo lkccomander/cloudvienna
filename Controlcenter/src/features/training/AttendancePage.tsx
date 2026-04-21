@@ -107,8 +107,10 @@ export function AttendancePage() {
                 <span className="mb-2 block text-sm text-[var(--muted)]">Source</span>
                 <select value={source} onChange={(event) => setSource(event.target.value)} className="theme-select">
                   <option value="web">web</option>
-                  <option value="desk">desk</option>
-                  <option value="manual">manual</option>
+                  <option value="admin">admin</option>
+                  <option value="coach">coach</option>
+                  <option value="kiosk">kiosk</option>
+                  <option value="qr">qr</option>
                 </select>
               </label>
             </div>
