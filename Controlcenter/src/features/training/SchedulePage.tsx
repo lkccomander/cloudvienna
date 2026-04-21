@@ -142,6 +142,7 @@ export function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
     if (!token) return;
@@ -186,6 +187,15 @@ export function SchedulePage() {
       location_id: selected.location_id ? String(selected.location_id) : "",
     });
   }, [selected]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(new Date());
+    }, 60_000);
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const todayIso = useMemo(() => toLocalIsoDate(new Date()), []);
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
@@ -258,6 +268,11 @@ export function SchedulePage() {
   );
 
   const timelineHeight = Math.max(560, ((calendarRange.end - calendarRange.start) / 60) * 76);
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const showCurrentTimeLine = todayIso >= weekStart && todayIso <= weekEnd && currentMinutes >= calendarRange.start && currentMinutes <= calendarRange.end;
+  const currentTimeLineTop = showCurrentTimeLine
+    ? ((currentMinutes - calendarRange.start) / (calendarRange.end - calendarRange.start || 1)) * timelineHeight
+    : null;
 
   const stats = useMemo(() => {
     const weekRows = rows.filter((row) => isSessionInWeek(row, weekStart));
@@ -549,6 +564,13 @@ export function SchedulePage() {
                     const top = ((minute - calendarRange.start) / (calendarRange.end - calendarRange.start || 1)) * timelineHeight;
                     return <div key={minute} className="absolute inset-x-0 border-t border-dashed border-[var(--line)]" style={{ top }} />;
                   })}
+
+                  {day === todayIso && showCurrentTimeLine && currentTimeLineTop !== null ? (
+                    <div className="pointer-events-none absolute inset-x-0 z-20" style={{ top: currentTimeLineTop }}>
+                      <div className="absolute left-0 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/70 bg-white shadow-[0_0_14px_rgba(255,255,255,0.45)]" />
+                      <div className="h-px w-full bg-white/90 shadow-[0_0_10px_rgba(255,255,255,0.35)]" />
+                    </div>
+                  ) : null}
 
                   {sessions.map((row) => {
                     const start = timeToMinutes(row.start_time) ?? calendarRange.start;
