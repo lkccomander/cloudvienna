@@ -8,6 +8,14 @@ import { api, ApiError } from "../../lib/api/client";
 import type { Teacher } from "../../lib/api/types";
 import { formatDate } from "../../lib/utils";
 
+const avatarPalette = [
+  { background: "#151d3b", foreground: "#f5f7ff" },
+  { background: "#2c355f", foreground: "#dfe5ff" },
+  { background: "#38457d", foreground: "#9db0ff" },
+  { background: "#4a484d", foreground: "#ffc95c" },
+  { background: "#24324f", foreground: "#d7e7ff" },
+];
+
 const emptyForm = {
   name: "",
   sex: "NA",
@@ -16,6 +24,23 @@ const emptyForm = {
   belt: "",
   hire_date: "",
 };
+
+function getTeacherInitials(name?: string | null) {
+  const parts = (name ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+}
+
+function getAvatarStyle(teacher: Teacher) {
+  const seed = `${teacher.id ?? ""}-${teacher.name ?? ""}-${teacher.email ?? ""}`;
+  const hash = Array.from(seed).reduce((accumulator, character) => accumulator + character.charCodeAt(0), 0);
+  return avatarPalette[hash % avatarPalette.length];
+}
 
 export function TeachersPage() {
   const { token } = useAuth();
@@ -69,8 +94,28 @@ export function TeachersPage() {
         <Panel title="Teachers" subtitle="Coach registry for the training desk and scheduling pipeline.">
           <DataTable
             columns={[
-              { key: "name", title: "Name", render: (row) => row.name || "-" },
-              { key: "email", title: "Email", render: (row) => row.email || "-" },
+              {
+                key: "name",
+                title: "Teacher",
+                render: (row) => {
+                  const avatarStyle = getAvatarStyle(row);
+                  return (
+                    <div className="flex min-w-[16rem] items-center gap-4">
+                      <div
+                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-xl font-semibold tracking-[-0.04em]"
+                        style={{ backgroundColor: avatarStyle.background, color: avatarStyle.foreground }}
+                        aria-hidden="true"
+                      >
+                        {getTeacherInitials(row.name)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold leading-tight text-[var(--text-strong)]">{row.name || "-"}</p>
+                        <p className="mt-1 truncate text-sm leading-tight text-[var(--muted)]">{row.email || "-"}</p>
+                      </div>
+                    </div>
+                  );
+                },
+              },
               { key: "belt", title: "Belt", render: (row) => row.belt || "-" },
               { key: "hire", title: "Hire date", render: (row) => formatDate(row.hire_date) },
               { key: "status", title: "Status", render: (row) => <span className={row.active ? "text-status-positive" : "text-status-negative"}>{row.active ? "Active" : "Inactive"}</span> },

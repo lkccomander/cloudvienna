@@ -114,6 +114,7 @@ export interface AttendanceRow {
 }
 
 export interface BirthdayRow {
+  student_id: number | null;
   name: string | null;
   belt: string | null;
   birthday: string | null;

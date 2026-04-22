@@ -8,6 +8,14 @@ import { api, ApiError } from "../../lib/api/client";
 import type { Location, Student } from "../../lib/api/types";
 import { formatBoolean, formatDate } from "../../lib/utils";
 
+const avatarPalette = [
+  { background: "#151d3b", foreground: "#f5f7ff" },
+  { background: "#2c355f", foreground: "#dfe5ff" },
+  { background: "#38457d", foreground: "#9db0ff" },
+  { background: "#4a484d", foreground: "#ffc95c" },
+  { background: "#24324f", foreground: "#d7e7ff" },
+];
+
 const emptyStudentForm = {
   name: "",
   sex: "NA",
@@ -19,6 +27,23 @@ const emptyStudentForm = {
   newsletter_opt_in: true,
   is_minor: false,
 };
+
+function getStudentInitials(name?: string | null) {
+  const parts = (name ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+}
+
+function getAvatarStyle(student: Student) {
+  const seed = `${student.id ?? ""}-${student.name ?? ""}-${student.email ?? ""}`;
+  const hash = Array.from(seed).reduce((accumulator, character) => accumulator + character.charCodeAt(0), 0);
+  return avatarPalette[hash % avatarPalette.length];
+}
 
 export function StudentsPage() {
   const { token } = useAuth();
@@ -100,12 +125,24 @@ export function StudentsPage() {
             {
               key: "name",
               title: "Student",
-              render: (row) => (
-                <div>
-                  <p className="font-medium text-[var(--text-strong)]">{row.name || "-"}</p>
-                  <p className="text-xs text-[var(--muted)]">{row.email || "-"}</p>
-                </div>
-              ),
+              render: (row) => {
+                const avatarStyle = getAvatarStyle(row);
+                return (
+                  <div className="flex min-w-[16rem] items-center gap-4">
+                    <div
+                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-xl font-semibold tracking-[-0.04em]"
+                      style={{ backgroundColor: avatarStyle.background, color: avatarStyle.foreground }}
+                      aria-hidden="true"
+                    >
+                      {getStudentInitials(row.name)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold leading-tight text-[var(--text-strong)]">{row.name || "-"}</p>
+                      <p className="mt-1 truncate text-sm leading-tight text-[var(--muted)]">{row.email || "-"}</p>
+                    </div>
+                  </div>
+                );
+              },
             },
             { key: "belt", title: "Belt", render: (row) => row.belt || "-" },
             { key: "location", title: "Location", render: (row) => row.location || "-" },

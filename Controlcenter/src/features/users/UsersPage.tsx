@@ -7,6 +7,14 @@ import { api, ApiError } from "../../lib/api/client";
 import type { ApiUser, UserRole } from "../../lib/api/types";
 import { formatDateTime } from "../../lib/utils";
 
+const avatarPalette = [
+  { background: "#151d3b", foreground: "#f5f7ff" },
+  { background: "#2c355f", foreground: "#dfe5ff" },
+  { background: "#38457d", foreground: "#9db0ff" },
+  { background: "#4a484d", foreground: "#ffc95c" },
+  { background: "#24324f", foreground: "#d7e7ff" },
+];
+
 const emptyForm = {
   username: "",
   password: "",
@@ -14,6 +22,18 @@ const emptyForm = {
   can_write: true,
   can_update: true,
 };
+
+function getUserInitials(username?: string | null) {
+  const value = (username ?? "").trim();
+  if (!value) return "?";
+  return value.slice(0, 2).toUpperCase();
+}
+
+function getAvatarStyle(user: ApiUser) {
+  const seed = `${user.id ?? ""}-${user.username ?? ""}-${user.role ?? ""}`;
+  const hash = Array.from(seed).reduce((accumulator, character) => accumulator + character.charCodeAt(0), 0);
+  return avatarPalette[hash % avatarPalette.length];
+}
 
 export function UsersPage() {
   const { token } = useAuth();
@@ -61,8 +81,28 @@ export function UsersPage() {
       <Panel title="API users" subtitle="Admin-only user management for access, permissions and resets.">
         <DataTable
           columns={[
-            { key: "username", title: "Username", render: (row) => row.username },
-            { key: "role", title: "Role", render: (row) => row.role },
+            {
+              key: "username",
+              title: "User",
+              render: (row) => {
+                const avatarStyle = getAvatarStyle(row);
+                return (
+                  <div className="flex min-w-[16rem] items-center gap-4">
+                    <div
+                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-xl font-semibold tracking-[-0.04em]"
+                      style={{ backgroundColor: avatarStyle.background, color: avatarStyle.foreground }}
+                      aria-hidden="true"
+                    >
+                      {getUserInitials(row.username)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold leading-tight text-[var(--text-strong)]">{row.username || "-"}</p>
+                      <p className="mt-1 truncate text-sm leading-tight text-[var(--muted)]">{row.role}</p>
+                    </div>
+                  </div>
+                );
+              },
+            },
             { key: "write", title: "Write", render: (row) => (row.can_write ? "Yes" : "No") },
             { key: "update", title: "Update", render: (row) => (row.can_update ? "Yes" : "No") },
             { key: "active", title: "Status", render: (row) => <span className={row.active ? "text-status-positive" : "text-status-negative"}>{row.active ? "Active" : "Inactive"}</span> },

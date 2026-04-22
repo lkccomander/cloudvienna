@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useI18n } from "../../app/providers/I18nProvider";
 import { Panel } from "../../components/Panel";
 import { LoadingBlock } from "../../components/feedback/LoadingBlock";
 import { DataTable } from "../../components/DataTable";
@@ -8,13 +9,58 @@ import { api, ApiError } from "../../lib/api/client";
 import type { Location, StudentDetail, StudentFollowupRoadmap } from "../../lib/api/types";
 import { formatBoolean, formatDate, formatDateTime } from "../../lib/utils";
 
+const stageStatusPalette = {
+  completed: {
+    border: "#7ca43a",
+    background: "rgba(124, 164, 58, 0.18)",
+    text: "#dff4b7",
+    accent: "#c8ec82",
+    badge: "rgba(200, 236, 130, 0.12)",
+  },
+  current: {
+    border: "#c98829",
+    background: "rgba(201, 136, 41, 0.18)",
+    text: "#ffe0b6",
+    accent: "#ffd58f",
+    badge: "rgba(255, 213, 143, 0.12)",
+  },
+  pending: {
+    border: "#5b76d6",
+    background: "rgba(91, 118, 214, 0.18)",
+    text: "#d6e0ff",
+    accent: "#b6c8ff",
+    badge: "rgba(182, 200, 255, 0.12)",
+  },
+} as const;
+
+const emptyFollowupForm = {
+  call_date: "",
+  points_of_interest: "",
+  main_reason: "",
+  goals: "",
+  notes: "",
+};
+
+function getFocusedStageNumber(followup: StudentFollowupRoadmap | null) {
+  if (!followup) return 1;
+  const currentStage = followup.stages.find((stage) => stage.status === "current");
+  if (currentStage) return currentStage.stage_number;
+  if (followup.current_stage) return followup.current_stage;
+  const nextPendingStage = followup.stages.find((stage) => stage.status === "pending");
+  if (nextPendingStage) return nextPendingStage.stage_number;
+  return followup.stages[followup.stages.length - 1]?.stage_number ?? 1;
+}
+
 export function StudentDetailPage() {
+  const { t } = useI18n();
   const { token } = useAuth();
   const params = useParams<{ studentId: string }>();
   const studentId = Number(params.studentId);
   const [student, setStudent] = useState<StudentDetail | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
   const [followup, setFollowup] = useState<StudentFollowupRoadmap | null>(null);
+  const [selectedStageNumber, setSelectedStageNumber] = useState(1);
+  const [followupForm, setFollowupForm] = useState(emptyFollowupForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -41,37 +87,63 @@ export function StudentDetailPage() {
     void load();
   }, [token, studentId]);
 
-  if (loading || !student) return <LoadingBlock label="Loading student detail..." />;
+  useEffect(() => {
+    setSelectedStageNumber(getFocusedStageNumber(followup));
+  }, [followup]);
+
+  useEffect(() => {
+    const selectedFollowup = followup?.followups.find((entry) => entry.stage_number === selectedStageNumber);
+    setFollowupForm(
+      selectedFollowup
+        ? {
+            call_date: selectedFollowup.call_date || "",
+            points_of_interest: selectedFollowup.points_of_interest || "",
+            main_reason: selectedFollowup.main_reason || "",
+            goals: selectedFollowup.goals || "",
+            notes: selectedFollowup.notes || "",
+          }
+        : emptyFollowupForm,
+    );
+  }, [followup, selectedStageNumber]);
+
+  if (loading || !student) return <LoadingBlock label={t("student.detail_loading")} />;
 
   const summaryCards = [
-    { label: "Location", value: student.location || "-" },
-    { label: "Birthday", value: formatDate(student.birthday) },
-    { label: "Newsletter", value: formatBoolean(student.newsletter_opt_in) },
-    { label: "Minor", value: formatBoolean(student.is_minor) },
+    { label: t("common.location"), value: student.location || "-" },
+    { label: t("common.birthday"), value: formatDate(student.birthday) },
+    { label: t("common.newsletter"), value: formatBoolean(student.newsletter_opt_in) },
+    { label: t("common.minor"), value: formatBoolean(student.is_minor) },
   ];
+  const stageRangeLabels: Record<number, string> = {
+    1: t("student.followup_range_1"),
+    2: t("student.followup_range_2"),
+    3: t("student.followup_range_3"),
+    4: t("student.followup_range_4"),
+    5: t("student.followup_range_5"),
+  };
 
   return (
     <div className="space-y-4">
       <section className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr_0.8fr]">
         <div className="glass-panel rounded-[1.75rem] px-5 py-5">
-          <p className="theme-kicker">Student record</p>
+          <p className="theme-kicker">{t("student.record")}</p>
           <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="theme-title text-2xl font-semibold text-[var(--text-strong)]">
-                {student.name || "Student detail"}
+                {student.name || t("student.detail_fallback")}
               </h1>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                ID {student.id} - Created {formatDateTime(student.created_at)}
+                ID {student.id} - {t("common.created")} {formatDateTime(student.created_at)}
               </p>
             </div>
             <div className="rounded-[1rem] border border-[var(--line)] bg-[var(--panel-soft)] px-4 py-3 text-right">
-              <p className="theme-kicker">Status</p>
+              <p className="theme-kicker">{t("common.status")}</p>
               <p
                 className={`mt-2 text-sm font-semibold ${
                   student.active ? "text-status-positive" : "text-status-negative"
                 }`}
               >
-                {student.active ? "Active record" : "Inactive record"}
+                {student.active ? t("student.status_record_active") : t("student.status_record_inactive")}
               </p>
             </div>
           </div>
@@ -88,8 +160,8 @@ export function StudentDetailPage() {
 
       <div className="grid gap-4 xl:grid-cols-[1fr_0.95fr]">
         <Panel
-          title="Identity and contact"
-          subtitle="Operational record fields used by reception, compliance and follow-up staff."
+          title={t("student.identity_title")}
+          subtitle={t("student.identity_subtitle")}
         >
           <form
             className="grid gap-4 md:grid-cols-2"
@@ -121,30 +193,30 @@ export function StudentDetailPage() {
                   guardian_phone2: student.guardian_phone2,
                   guardian_relationship: student.guardian_relationship,
                 });
-                setMessage("Student updated.");
+                setMessage(t("student.updated_success"));
                 await load();
               } catch (error) {
-                setMessage(error instanceof ApiError ? error.message : "Student update failed");
+                setMessage(error instanceof ApiError ? error.message : t("student.updated_failed"));
               } finally {
                 setSaving(false);
               }
             }}
           >
             {[
-              ["Name", "name"],
-              ["Email", "email"],
-              ["Belt", "belt"],
-              ["Phone", "phone"],
-              ["Phone 2", "phone2"],
-              ["Address", "direction"],
-              ["Postal code", "postalcode"],
-              ["Country", "country"],
-              ["Tax ID", "taxid"],
-              ["Guardian name", "guardian_name"],
-              ["Guardian email", "guardian_email"],
-              ["Guardian phone", "guardian_phone"],
-              ["Guardian phone 2", "guardian_phone2"],
-              ["Guardian relationship", "guardian_relationship"],
+              [t("common.name"), "name"],
+              [t("common.email"), "email"],
+              [t("student.field.belt"), "belt"],
+              [t("common.phone"), "phone"],
+              [t("student.field.phone2"), "phone2"],
+              [t("common.address"), "direction"],
+              [t("common.postal_code"), "postalcode"],
+              [t("common.country"), "country"],
+              [t("student.field.tax_id"), "taxid"],
+              [t("student.field.guardian_name"), "guardian_name"],
+              [t("student.field.guardian_email"), "guardian_email"],
+              [t("student.field.guardian_phone"), "guardian_phone"],
+              [t("student.field.guardian_phone2"), "guardian_phone2"],
+              [t("student.field.guardian_relationship"), "guardian_relationship"],
             ].map(([label, key]) => (
               <label key={key} className="block">
                 <span className="mb-2 block text-sm text-[var(--muted)]">{label}</span>
@@ -162,7 +234,7 @@ export function StudentDetailPage() {
               </label>
             ))}
             <label className="block">
-              <span className="mb-2 block text-sm text-[var(--muted)]">Birthday</span>
+              <span className="mb-2 block text-sm text-[var(--muted)]">{t("common.birthday")}</span>
               <input
                 type="date"
                 value={student.birthday || ""}
@@ -175,7 +247,7 @@ export function StudentDetailPage() {
               />
             </label>
             <label className="block">
-              <span className="mb-2 block text-sm text-[var(--muted)]">Weight</span>
+              <span className="mb-2 block text-sm text-[var(--muted)]">{t("common.weight")}</span>
               <input
                 value={student.weight ?? ""}
                 onChange={(event) =>
@@ -192,7 +264,7 @@ export function StudentDetailPage() {
               />
             </label>
             <label className="block">
-              <span className="mb-2 block text-sm text-[var(--muted)]">Location</span>
+              <span className="mb-2 block text-sm text-[var(--muted)]">{t("common.location")}</span>
               <select
                 value={student.location_id || ""}
                 onChange={(event) =>
@@ -207,7 +279,7 @@ export function StudentDetailPage() {
                 }
                 className="theme-select"
               >
-                <option value="">No location</option>
+                <option value="">{t("student.no_location")}</option>
                 {locations.map((location) => (
                   <option key={location.id} value={location.id}>
                     {location.name}
@@ -226,7 +298,7 @@ export function StudentDetailPage() {
                     )
                   }
                 />
-                Newsletter opt-in
+                {t("student.newsletter_opt_in")}
               </label>
               <label className="theme-check text-sm">
                 <input
@@ -238,7 +310,7 @@ export function StudentDetailPage() {
                     )
                   }
                 />
-                Minor
+                {t("common.minor")}
               </label>
               <label className="theme-check text-sm">
                 <input
@@ -250,7 +322,7 @@ export function StudentDetailPage() {
                     await load();
                   }}
                 />
-                Active
+                {t("student.active_label")}
               </label>
             </div>
             {message ? (
@@ -264,36 +336,53 @@ export function StudentDetailPage() {
                 disabled={saving}
                 className="theme-primary-button px-4 py-3 disabled:opacity-70"
               >
-                {saving ? "Saving..." : "Save student"}
+                {saving ? t("common.saving") : t("common.save_changes")}
               </button>
               <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel-soft)] px-4 py-3 text-sm text-[var(--muted)]">
-                Last refresh from record snapshot
+                {t("student.last_refresh_snapshot")}
               </div>
             </div>
           </form>
         </Panel>
 
         <Panel
-          title="Follow-up roadmap"
-          subtitle="Call stages and coaching signals tied to the academy follow-up process."
+          title={t("student.followup_title")}
+          subtitle={t("student.followup_subtitle")}
         >
           {followup ? (
             <div className="space-y-4">
+              <div className="rounded-[1.2rem] border border-[#c98829] bg-[rgba(201,136,41,0.14)] px-4 py-4">
+                <div className="flex items-start gap-3">
+                  <div
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                    style={{ color: "#ffd58f", background: "rgba(255, 213, 143, 0.14)" }}
+                    aria-hidden="true"
+                  >
+                    !
+                  </div>
+                  <div>
+                    <p className="theme-kicker" style={{ color: "#ffd58f" }}>
+                      {t("student.followup_warning_title")}
+                    </p>
+                    <p className="mt-2 text-sm text-[#ffe0b6]">{t("student.followup_warning_body")}</p>
+                  </div>
+                </div>
+              </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-[1rem] border border-[var(--line)] bg-[var(--panel)] px-4 py-4">
-                  <p className="theme-kicker">Current stage</p>
+                  <p className="theme-kicker">{t("common.current_stage")}</p>
                   <p className="theme-title mt-2 text-2xl font-semibold text-[var(--text-strong)] [font-variant-numeric:tabular-nums]">
                     {followup.current_stage ?? "-"}
                   </p>
                 </div>
                 <div className="rounded-[1rem] border border-[var(--line)] bg-[var(--panel)] px-4 py-4">
-                  <p className="theme-kicker">Program completed</p>
+                  <p className="theme-kicker">{t("common.program_completed")}</p>
                   <p className="theme-title mt-2 text-2xl font-semibold text-[var(--text-strong)]">
-                    {followup.program_completed ? "Yes" : "No"}
+                    {followup.program_completed ? t("common.yes") : t("common.no")}
                   </p>
                 </div>
                 <div className="rounded-[1rem] border border-[var(--line)] bg-[var(--panel)] px-4 py-4">
-                  <p className="theme-kicker">Last call</p>
+                  <p className="theme-kicker">{t("common.last_call")}</p>
                   <p className="theme-title mt-2 text-2xl font-semibold text-[var(--text-strong)]">
                     {formatDate(followup.last_call_date)}
                   </p>
@@ -301,21 +390,51 @@ export function StudentDetailPage() {
               </div>
               <div className="grid gap-3 sm:grid-cols-5">
                 {followup.stages.map((stage) => {
-                  const stageClass =
+                  const palette = stageStatusPalette[stage.status];
+                  const isSelected = stage.stage_number === selectedStageNumber;
+                  const statusLabel =
                     stage.status === "completed"
-                      ? "border-[var(--line)] bg-[color:var(--success)]/10"
+                      ? t("student.followup_status_completed")
                       : stage.status === "current"
-                        ? "border-[var(--accent)]/50 bg-[var(--accent-soft)]"
-                        : "border-[var(--line)] bg-[var(--panel-soft)]";
+                        ? t("student.followup_status_current")
+                        : t("student.followup_status_pending");
 
                   return (
-                    <div key={stage.stage_number} className={`rounded-[1rem] border px-4 py-4 text-center ${stageClass}`}>
-                      <p className="theme-kicker">Stage</p>
-                      <p className="theme-title mt-2 text-2xl font-semibold text-[var(--text-strong)]">
-                        {stage.stage_number}
+                    <button
+                      key={stage.stage_number}
+                      type="button"
+                      onClick={() => setSelectedStageNumber(stage.stage_number)}
+                      className="rounded-[1.35rem] border px-4 py-4 text-left transition duration-200 hover:-translate-y-0.5"
+                      style={{
+                        borderColor: palette.border,
+                        background: palette.background,
+                        boxShadow: isSelected ? `0 0 0 1px ${palette.accent}, 0 14px 34px rgba(15, 23, 42, 0.24)` : undefined,
+                      }}
+                      aria-pressed={isSelected}
+                    >
+                      <div>
+                        <p className="theme-kicker" style={{ color: palette.accent }}>
+                          {t("common.stage")}
+                        </p>
+                        <p className="theme-title mt-2 text-2xl font-semibold" style={{ color: palette.text }}>
+                          {stage.stage_number}
+                        </p>
+                        <p className="mt-2 text-xs font-medium tracking-[0.08em]" style={{ color: palette.accent }}>
+                          {stageRangeLabels[stage.stage_number] || t("student.followup_range_custom")}
+                        </p>
+                        <span
+                          className="mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
+                          style={{ color: palette.accent, background: palette.badge }}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <p className="mt-4 text-sm font-medium" style={{ color: palette.text }}>
+                        {stage.call_date
+                          ? t("student.followup_call_logged").replace("{date}", formatDate(stage.call_date))
+                          : t("student.followup_waiting")}
                       </p>
-                      <p className="mt-2 text-sm text-[var(--text)]">{stage.status}</p>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -324,58 +443,95 @@ export function StudentDetailPage() {
                 onSubmit={async (event) => {
                   event.preventDefault();
                   if (!token) return;
-                  const formData = new FormData(event.currentTarget);
                   setFollowupMessage(null);
                   try {
                     await api.upsertStudentFollowup(token, student.id, {
-                      stage_number: Number(formData.get("stage_number")),
-                      call_date: formData.get("call_date") || null,
-                      points_of_interest: formData.get("points_of_interest") || null,
-                      main_reason: formData.get("main_reason") || null,
-                      goals: formData.get("goals") || null,
-                      notes: formData.get("notes") || null,
+                      stage_number: selectedStageNumber,
+                      call_date: followupForm.call_date || null,
+                      points_of_interest: followupForm.points_of_interest || null,
+                      main_reason: followupForm.main_reason || null,
+                      goals: followupForm.goals || null,
+                      notes: followupForm.notes || null,
                     });
                     await load();
-                    setFollowupMessage("Follow-up saved.");
-                    event.currentTarget.reset();
+                    setFollowupMessage(t("student.followup_saved"));
                   } catch (error) {
-                    setFollowupMessage(error instanceof ApiError ? error.message : "Follow-up save failed");
+                    setFollowupMessage(error instanceof ApiError ? error.message : t("student.followup_failed"));
                   }
                 }}
               >
                 <label className="block">
-                  <span className="mb-2 block text-sm text-[var(--muted)]">Stage</span>
+                  <span className="mb-2 block text-sm text-[var(--muted)]">{t("common.stage")}</span>
                   <select
                     name="stage_number"
                     className="theme-select"
-                    defaultValue={followup.current_stage ?? 1}
+                    value={selectedStageNumber}
+                    onChange={(event) => setSelectedStageNumber(Number(event.target.value))}
                   >
                     {Array.from({ length: 7 }).map((_, index) => (
                       <option key={index + 1} value={index + 1}>
-                        Stage {index + 1}
+                        {t("common.stage")} {index + 1}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="block">
-                  <span className="mb-2 block text-sm text-[var(--muted)]">Call date</span>
-                  <input name="call_date" type="date" className="theme-input" />
+                  <span className="mb-2 block text-sm text-[var(--muted)]">{t("common.last_call")}</span>
+                  <input
+                    name="call_date"
+                    type="date"
+                    className="theme-input"
+                    value={followupForm.call_date}
+                    onChange={(event) =>
+                      setFollowupForm((current) => ({ ...current, call_date: event.target.value }))
+                    }
+                  />
                 </label>
                 <label className="block">
-                  <span className="mb-2 block text-sm text-[var(--muted)]">Points of interest</span>
-                  <input name="points_of_interest" className="theme-input" />
+                  <span className="mb-2 block text-sm text-[var(--muted)]">{t("student.followup_points")}</span>
+                  <input
+                    name="points_of_interest"
+                    className="theme-input"
+                    value={followupForm.points_of_interest}
+                    onChange={(event) =>
+                      setFollowupForm((current) => ({ ...current, points_of_interest: event.target.value }))
+                    }
+                  />
                 </label>
                 <label className="block">
-                  <span className="mb-2 block text-sm text-[var(--muted)]">Main reason</span>
-                  <input name="main_reason" className="theme-input" />
+                  <span className="mb-2 block text-sm text-[var(--muted)]">{t("student.followup_main_reason")}</span>
+                  <input
+                    name="main_reason"
+                    className="theme-input"
+                    value={followupForm.main_reason}
+                    onChange={(event) =>
+                      setFollowupForm((current) => ({ ...current, main_reason: event.target.value }))
+                    }
+                  />
                 </label>
                 <label className="block md:col-span-2">
-                  <span className="mb-2 block text-sm text-[var(--muted)]">Goals</span>
-                  <textarea name="goals" rows={3} className="theme-textarea" />
+                  <span className="mb-2 block text-sm text-[var(--muted)]">{t("common.goals")}</span>
+                  <textarea
+                    name="goals"
+                    rows={3}
+                    className="theme-textarea"
+                    value={followupForm.goals}
+                    onChange={(event) =>
+                      setFollowupForm((current) => ({ ...current, goals: event.target.value }))
+                    }
+                  />
                 </label>
                 <label className="block md:col-span-2">
-                  <span className="mb-2 block text-sm text-[var(--muted)]">Notes</span>
-                  <textarea name="notes" rows={4} className="theme-textarea" />
+                  <span className="mb-2 block text-sm text-[var(--muted)]">{t("common.notes")}</span>
+                  <textarea
+                    name="notes"
+                    rows={4}
+                    className="theme-textarea"
+                    value={followupForm.notes}
+                    onChange={(event) =>
+                      setFollowupForm((current) => ({ ...current, notes: event.target.value }))
+                    }
+                  />
                 </label>
                 {followupMessage ? (
                   <div className="md:col-span-2 rounded-2xl border border-[var(--line)] bg-[var(--panel-soft)] px-4 py-3 text-sm text-[var(--text)]">
@@ -384,32 +540,32 @@ export function StudentDetailPage() {
                 ) : null}
                 <div className="md:col-span-2">
                   <button type="submit" className="theme-primary-button px-4 py-3">
-                    Save follow-up
+                    {t("common.save")}
                   </button>
                 </div>
               </form>
               <DataTable
                 columns={[
-                  { key: "stage", title: "Stage", render: (row) => row.stage_number },
-                  { key: "call", title: "Call date", render: (row) => formatDate(row.call_date) },
-                  { key: "reason", title: "Reason", render: (row) => row.main_reason || "-" },
-                  { key: "goals", title: "Goals", render: (row) => row.goals || "-" },
-                  { key: "updated", title: "Updated", render: (row) => formatDateTime(row.updated_at || row.created_at) },
+                  { key: "stage", title: t("common.stage"), render: (row) => row.stage_number },
+                  { key: "call", title: t("common.last_call"), render: (row) => formatDate(row.call_date) },
+                  { key: "reason", title: t("common.reason"), render: (row) => row.main_reason || "-" },
+                  { key: "goals", title: t("common.goals"), render: (row) => row.goals || "-" },
+                  { key: "updated", title: t("common.updated"), render: (row) => formatDateTime(row.updated_at || row.created_at) },
                 ]}
                 rows={followup.followups}
                 rowKey={(row) => row.id}
-                emptyMessage="No follow-up calls have been logged for this student yet."
+                emptyMessage={t("student.followup_empty")}
               />
             </div>
           ) : (
             <div className="rounded-[1rem] border border-[var(--line)] bg-[var(--panel-soft)] px-4 py-5 text-sm text-[var(--muted)]">
-              No roadmap data is available for this student yet.
+              {t("student.followup_no_roadmap")}
             </div>
           )}
         </Panel>
       </div>
 
-      <Panel title="Student summary" subtitle="High-signal identity and compliance data">
+      <Panel title={t("student.summary_title")} subtitle={t("student.summary_subtitle")}>
         <div className="grid gap-4 md:grid-cols-4">
           {summaryCards.map((card) => (
             <div

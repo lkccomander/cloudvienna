@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useI18n } from "../../app/providers/I18nProvider";
 import { Panel } from "../../components/Panel";
 import { LoadingBlock } from "../../components/feedback/LoadingBlock";
@@ -38,7 +39,18 @@ export function BirthdaysPage() {
     <Panel title={t("news.birthdays_title")} subtitle={t("news.birthdays_subtitle")}>
       <DataTable
         columns={[
-          { key: "name", title: t("common.student"), render: (row) => row.name || "-" },
+          {
+            key: "name",
+            title: t("common.student"),
+            render: (row) =>
+              row.student_id ? (
+                <Link to={`/students/${row.student_id}`} className="font-medium text-[var(--accent)] transition hover:opacity-80 hover:underline">
+                  {row.name || "-"}
+                </Link>
+              ) : (
+                row.name || "-"
+              ),
+          },
           { key: "belt", title: "Belt", render: (row) => row.belt || "-" },
           { key: "birthday", title: t("dashboard.birthdays"), render: (row) => formatDate(row.birthday) },
           {

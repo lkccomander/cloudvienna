@@ -1252,7 +1252,7 @@ def news_birthdays(_: str = Depends(_require_auth)):
     """
     rows = fetch_all(
         """
-        SELECT s.name, s.belt, s.birthday, s.active
+        SELECT s.id AS student_id, s.name, s.belt, s.birthday, s.active
         FROM t_students s
         WHERE s.birthday IS NOT NULL
           AND EXTRACT(MONTH FROM s.birthday) = EXTRACT(MONTH FROM CURRENT_DATE)

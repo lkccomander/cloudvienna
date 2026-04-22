@@ -359,6 +359,7 @@ class AttendanceRow(BaseModel):
 
 
 class BirthdayNotificationRow(BaseModel):
+    student_id: Optional[int] = None
     name: Optional[str] = None
     belt: Optional[str] = None
     birthday: Optional[date] = None
