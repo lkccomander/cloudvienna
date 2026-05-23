@@ -15,6 +15,7 @@ type ScheduleFiltersBarProps = {
   onStatusFilterChange: (value: StatusFilter) => void;
   onQueryChange: (value: string) => void;
   onCreateSession: (form: ScheduleFormValues) => void;
+  createEnabled?: boolean;
 };
 
 export function ScheduleFiltersBar({
@@ -31,18 +32,21 @@ export function ScheduleFiltersBar({
   onStatusFilterChange,
   onQueryChange,
   onCreateSession,
+  createEnabled = true,
 }: ScheduleFiltersBarProps) {
   return (
     <>
-      <div className="mb-4 flex justify-end">
-        <button
-          type="button"
-          onClick={() => onCreateSession({ class_id: "", session_date: weekStart, start_time: "", end_time: "", location_id: "" })}
-          className="theme-primary-button px-4 py-3 text-sm"
-        >
-          New session
-        </button>
-      </div>
+      {createEnabled ? (
+        <div className="mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => onCreateSession({ class_id: "", session_date: weekStart, start_time: "", end_time: "", location_id: "" })}
+            className="theme-primary-button px-4 py-3 text-sm"
+          >
+            New session
+          </button>
+        </div>
+      ) : null}
 
       <div className="mb-4 grid gap-3 md:grid-cols-5">
         <label className="block">

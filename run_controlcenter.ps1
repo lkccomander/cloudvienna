@@ -31,6 +31,13 @@ if (-not (Test-Path "node_modules")) {
     }
 }
 
+Write-Host "[INFO] Running Controlcenter build..." -ForegroundColor Cyan
+& npm run build
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[ERROR] npm run build failed." -ForegroundColor Red
+    exit $LASTEXITCODE
+}
+
 Write-Host "[INFO] Controlcenter is starting. Vite will print the actual local URL below." -ForegroundColor Green
 Write-Host "       Preferred URL: http://127.0.0.1:4173/" -ForegroundColor Green
 Write-Host ""

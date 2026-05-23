@@ -69,7 +69,7 @@ export function SessionsPage() {
       <div className="flex flex-wrap gap-3">
         <Link to="/training/schedule" className="theme-secondary-button px-4 py-3 text-sm hover:bg-[var(--hover)]">Schedule</Link>
         <Link to="/training/classes" className="theme-secondary-button px-4 py-3 text-sm hover:bg-[var(--hover)]">Classes</Link>
-        <Link to="/training/attendance" className="theme-secondary-button px-4 py-3 text-sm hover:bg-[var(--hover)]">Attendance</Link>
+        <Link to="/attendance" className="theme-secondary-button px-4 py-3 text-sm hover:bg-[var(--hover)]">Attendance</Link>
       </div>
       <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
         <Panel title="Sessions" subtitle="Scheduled class events by day, time and location.">

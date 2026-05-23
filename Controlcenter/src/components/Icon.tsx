@@ -12,6 +12,7 @@ export type IconName =
   | "layers"
   | "logOut"
   | "mapPin"
+  | "menu"
   | "moon"
   | "newspaper"
   | "plus"
@@ -32,6 +33,7 @@ const paths: Record<IconName, string[]> = {
   layers: ["m12 3 9 5-9 5-9-5 9-5Z", "m3 12 9 5 9-5", "m3 16 9 5 9-5"],
   logOut: ["M10 17l5-5-5-5", "M15 12H3", "M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"],
   mapPin: ["M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z", "M12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"],
+  menu: ["M4 7h16", "M4 12h16", "M4 17h16"],
   moon: ["M20 15.5A8.5 8.5 0 0 1 8.5 4 9 9 0 1 0 20 15.5Z"],
   newspaper: ["M4 5h13a3 3 0 0 1 3 3v11H6a2 2 0 0 1-2-2V5Z", "M8 9h5M8 13h8M8 17h5", "M17 8h3"],
   plus: ["M12 5v14M5 12h14"],

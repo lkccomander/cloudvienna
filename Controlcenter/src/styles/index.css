@@ -140,17 +140,13 @@ textarea {
 
 .nav-link {
   color: var(--text);
-  border: 1px solid transparent;
 }
 
 .nav-icon {
-  background: var(--panel-soft);
-  border: 1px solid var(--line);
   color: var(--muted);
 }
 
 .nav-link:hover {
-  border-color: var(--line);
   background: var(--hover);
   color: var(--text-strong);
 }
@@ -160,15 +156,12 @@ textarea {
 }
 
 .nav-link-active {
-  border-color: rgba(68, 90, 184, 0.24);
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 600;
 }
 
 .nav-link-active .nav-icon {
-  border-color: rgba(68, 90, 184, 0.28);
-  background: var(--badge-bg);
   color: var(--accent);
 }
 

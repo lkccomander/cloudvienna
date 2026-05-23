@@ -52,7 +52,8 @@ export const router = createBrowserRouter([
           { path: "/training/classes", element: <ClassesPage /> },
           { path: "/training/sessions", element: <SessionsPage /> },
           { path: "/training/schedule", element: <SchedulePage /> },
-          { path: "/training/attendance", element: <AttendancePage /> },
+          { path: "/attendance", element: <AttendancePage /> },
+          { path: "/training/attendance", element: <Navigate to="/attendance" replace /> },
           { path: "/profile/preferences", element: <Navigate to="/dashboard" replace /> },
           {
             element: <RequireRoles roles={["admin"]} />,

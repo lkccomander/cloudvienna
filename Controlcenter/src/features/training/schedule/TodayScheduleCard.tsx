@@ -9,9 +9,18 @@ type TodayScheduleCardProps = {
   onCreateSession: (form: ScheduleFormValues) => void;
   onSelectSession: (row: SessionRow) => void;
   onFocusCurrentWeek: (value: string) => void;
+  createEnabled?: boolean;
 };
 
-export function TodayScheduleCard({ todayIso, todayRows, nextTodaySession, onCreateSession, onSelectSession, onFocusCurrentWeek }: TodayScheduleCardProps) {
+export function TodayScheduleCard({
+  todayIso,
+  todayRows,
+  nextTodaySession,
+  onCreateSession,
+  onSelectSession,
+  onFocusCurrentWeek,
+  createEnabled = true,
+}: TodayScheduleCardProps) {
   return (
     <div className="mb-6 rounded-[1.25rem] border border-[var(--line)] bg-[var(--panel)] p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -28,13 +37,15 @@ export function TodayScheduleCard({ todayIso, todayRows, nextTodaySession, onCre
           >
             Focus current week
           </button>
-          <button
-            type="button"
-            onClick={() => onCreateSession({ class_id: "", session_date: todayIso, start_time: "", end_time: "", location_id: "" })}
-            className="theme-primary-button px-3 py-2 text-sm"
-          >
-            Add today session
-          </button>
+          {createEnabled ? (
+            <button
+              type="button"
+              onClick={() => onCreateSession({ class_id: "", session_date: todayIso, start_time: "", end_time: "", location_id: "" })}
+              className="theme-primary-button px-3 py-2 text-sm"
+            >
+              Add today session
+            </button>
+          ) : null}
         </div>
       </div>
 
